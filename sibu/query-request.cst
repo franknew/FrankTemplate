@@ -1,0 +1,102 @@
+﻿<%@ Template Language="C#" TargetLanguage="Java" Encoding="UTF-8" ResponseEncoding="UTF-8"%>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer"%>
+<%@ Import Namespace="System.Text" %>
+<%@ Property Name="Table" Type="SchemaExplorer.TableSchema" Optional="True"%>
+<%@ Property Name="NameSpace" Type="System.String" Default="com.sibu.mall.accountant" %>
+
+<script runat="template">
+// My methods here.
+public String ConvertTableCamel(String tableName) {
+    tableName = tableName.TrimStart('t','_').TrimEnd('_');
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = true;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+public String ConvertColumnCamel(String tableName) {
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = false;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+
+public string ConvertColumnType(DbType type) {
+    string typeName = "String";
+    switch (type) {
+        case DbType.Int16:
+        case DbType.Int32:
+        case DbType.Int64:
+        case DbType.Boolean:
+        case DbType.UInt16:
+        case DbType.UInt32:
+        case DbType.UInt64:
+        case DbType.SByte:
+            typeName = "Integer";
+            break;
+        case DbType.String:
+            typeName = "String";
+            break;
+        case DbType.DateTime:
+        case DbType.Date:
+            typeName = "Date";
+            break;
+        case DbType.Decimal:
+            typeName = "BigDecimal";
+            break;
+    }
+    return typeName;
+}
+</script>
+package <%=NameSpace%>.service;
+import com.doubo.common.model.CommonPageResult;
+import com.doubo.common.model.response.CommonResponse;
+import com.doubo.common.model.CommonPageResult;
+
+/**
+* <%=Table.Description%>
+* @author codesmith
+**/
+public class Query<%=ConvertTableCamel(Table.Name)%>Request extends PageQueryRequest {
+    <%foreach(DataColumn column in Table.Columns) {%>
+    <%  string columnType = ConvertColumnType(column.DataType);
+        
+    %>
+    <%} %>
+}

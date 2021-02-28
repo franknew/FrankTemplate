@@ -1,0 +1,141 @@
+﻿<%@ Template Language="C#" TargetLanguage="Java" Encoding="UTF-8" ResponseEncoding="UTF-8"%>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="System.Collections.Generic" %>
+<%@ Import Namespace="System.IO" %>
+<%@ Import Namespace="SchemaExplorer"%>
+<%@ Import Namespace="System.Text" %>
+<%@ Property Name="Table" Type="SchemaExplorer.TableSchema" Optional="True"%>
+<%@ Property Name="NameSpace" Type="System.String" Default="com.sibu.mall.accountant" %>
+<%@ Property Name="Output" Type="System.String" Default="E:\\template\\output\\" %>
+<%@ Register Name="entity" Template="entity.cst" %>
+<%@ Register Name="mapper" Template="mapper.cst" %>
+<%@ Register Name="xml" Template="xml.cst" %>
+<%@ Register Name="service" Template="basicservice.cst" %>
+<%@ Register Name="query" Template="query-response.cst" %>
+
+<script runat="template">
+// My methods here.
+public String ConvertTableCamel(String tableName) {
+    if (tableName.StartsWith("t_")) {
+        tableName = tableName.TrimStart('t','_').TrimEnd('_');
+    }
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = true;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+public String ConvertColumnCamel(String tableName) {
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = false;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+
+public string ConvertColumnType(DbType type) {
+    string typeName = "String";
+    switch (type) {
+        case DbType.Int16:
+        case DbType.Int32:
+        case DbType.Int64:
+            typeName = "Integer";
+            break;
+        case DbType.String:
+            typeName = "String";
+            break;
+        case DbType.DateTime:
+        case DbType.Date:
+            typeName = "Date";
+            break;
+        case DbType.Decimal:
+            typeName = "BigDecimal";
+            break;
+    }
+    return typeName;
+}
+
+public void RenderToFile(CodeTemplate template, string fileName) {
+    if (File.Exists(fileName)) {
+        File.Delete(fileName);
+    }
+    string code = template.RenderToString();
+    // 使用UTF-8格式写文件
+    using (FileStream fs = new FileStream(fileName, FileMode.Create, FileAccess.Write))
+    {
+        using (StreamWriter sw = new StreamWriter(fs, new System.Text.UTF8Encoding(false))) // false表示使用UTF-8格式。
+        {
+            sw.Write(code);
+            sw.Flush();
+            fs.Flush();
+        }
+    }
+}
+</script>
+<%
+string path = Output + "\\";
+DirectoryInfo directory = new DirectoryInfo(path);
+if (!directory.Exists) {
+    directory.Create();
+}
+CodeTemplate entity = new entity();
+entity.SetProperty("Table", Table);
+entity.SetProperty("NameSpace", NameSpace);
+RenderToFile(entity, path + ConvertTableCamel(Table.Name) + ".java");
+
+CodeTemplate mapper = new mapper();
+mapper.SetProperty("Table", Table);
+mapper.SetProperty("NameSpace", NameSpace);
+RenderToFile(mapper, path + ConvertTableCamel(Table.Name) + "Mapper.java");
+
+CodeTemplate xml = new xml();
+xml.SetProperty("Table", Table);
+xml.SetProperty("NameSpace", NameSpace);
+RenderToFile(xml, path + ConvertTableCamel(Table.Name) + "Mapper.xml");
+
+CodeTemplate service = new service();
+service.SetProperty("Table", Table);
+service.SetProperty("NameSpace", NameSpace);
+RenderToFile(service, path + ConvertTableCamel(Table.Name) + "Service.java");
+
+CodeTemplate query = new query();
+query.SetProperty("Table", Table);
+query.SetProperty("NameSpace", NameSpace);
+RenderToFile(query, path + "Query" + ConvertTableCamel(Table.Name) + "Response.java");
+
+
+%>

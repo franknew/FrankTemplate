@@ -1,0 +1,95 @@
+﻿<%@ Template Language="C#" TargetLanguage="Java" Encoding="UTF-8" ResponseEncoding="UTF-8"%>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer"%>
+<%@ Import Namespace="System.Text" %>
+<%@ Property Name="Table" Type="SchemaExplorer.TableSchema" Optional="True"%>
+<%@ Property Name="NameSpace" Type="System.String" Default="com.sibu.mall.accountant" %>
+
+<script runat="template">
+// My methods here.
+public String ConvertTableCamel(String tableName) {
+    tableName = tableName.TrimStart('t','_').TrimEnd('_');
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = true;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+public String ConvertColumnCamel(String tableName) {
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = false;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+
+public string ConvertColumnType(DbType type) {
+    string typeName = "String";
+    switch (type) {
+        case DbType.Int16:
+        case DbType.Int32:
+        case DbType.Int64:
+            typeName = "Integer";
+            break;
+        case DbType.String:
+            typeName = "String";
+            break;
+        case DbType.DateTime:
+        case DbType.Date:
+            typeName = "Date";
+            break;
+        case DbType.Decimal:
+            typeName = "BigDecimal";
+            break;
+    }
+    return typeName;
+}
+</script>
+
+package <%=NameSpace%>.persistence.dao;
+
+import com.baomidou.mybatisplus.mapper.BaseMapper;
+import <%=NameSpace%>.persistence.entity.<%=ConvertTableCamel(Table.Name)%>;
+
+/**
+* <%=Table.Description%>
+ * @author codesmith
+ */
+public interface <%=ConvertTableCamel(Table.Name)%>Mapper extends BaseMapper<<%=ConvertTableCamel(Table.Name)%>> {
+}
+
+

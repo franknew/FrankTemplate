@@ -1,0 +1,91 @@
+﻿<%-- 
+Name:
+Author: 
+Description: 
+--%>
+<%@ Template Language="C#" TargetLanguage="Java" Encoding="UTF-8" ResponseEncoding="UTF-8"%>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer"%>
+<%@ Import Namespace="System.Collections.Generic" %>
+<%@ Import Namespace="System.IO" %>
+<%@ Property Name="Datasource" Type="SchemaExplorer.DatabaseSchema" Optional="True"%>
+<%@ Property Name="NameSpace" Type="System.String" Default="com.sibu.mall.accountant" %>
+<%@ Property Name="Output" Type="System.String" Default="E:\template\output"%>
+<%@ Register Name="sibu" Template="sibu-columns.cst" %>
+
+<script runat="template">
+public String ConvertCamel(String tableName) {
+    tableName = tableName.TrimEnd('_');
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = true;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+
+public String ConvertToJavaPackage(String tableName) {
+    tableName = tableName.TrimEnd('_');
+    StringBuilder builder = new StringBuilder();
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (ch.Equals('_')) {
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+
+</script>
+
+<%
+Dictionary<string, string> dic = new Dictionary<string, string>();
+string dbName = ConvertCamel(Datasource.Database.Name);
+string packageName = ConvertToJavaPackage(Datasource.Database.Name);
+string path = Output.TrimEnd('\\') + "\\" + packageName;
+DirectoryInfo directory = new DirectoryInfo(path);
+if (!directory.Exists) {
+    directory.Create();
+}
+foreach (TableSchema table in Datasource.Database.Tables) {
+    char last = table.Name[table.Name.Length - 1];
+    int parse = -1;
+    String tableName = ConvertCamel(table.Name);
+    if (dic.ContainsKey(tableName)) {
+        continue;
+    }
+    String fileName = path + "\\" + tableName + "Columns.java";
+    CodeTemplate template = new sibu();
+    template.SetProperty("Table", table);
+    template.SetProperty("NameSpace", NameSpace + "." + packageName);
+    template.RenderToFile(fileName, true);
+    dic[tableName] = "";
+    %>
+    <%=fileName %>
+    <%
+}
+%>
