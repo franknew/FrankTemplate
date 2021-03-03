@@ -1,0 +1,164 @@
+﻿<%@ Template Language="C#" TargetLanguage="Text" Encoding="UTF-8" ResponseEncoding="UTF-8"%>
+<%@ Import Namespace="System.Text" %>
+<%@ Import Namespace="System.Collections.Generic" %>
+<%@ Property Name="TableName" Type="String" Optional="True"%>
+<%@ Property Name="ClassName" Type="String" Optional="True"%>
+<%@ Property Name="Description" Type="String" Optional="True"%>
+<%@ Property Name="Columns" Type="System.Data.DataTable" Optional="True"%>
+<%@ Property Name="InnerArgs" Type="System.Data.DataTable" Optional="True"%>
+
+<script runat="template">
+public Dictionary<string, string> InitPrefix() {
+    Dictionary<string, string> dic = new Dictionary<string, string>();
+    dic["t_"] = "";
+    dic["c_"] = "";
+    return dic;
+}
+
+// My methods here.
+public String ConvertTableCamel(String tableName) {
+    Dictionary<string, string> prefix = InitPrefix();
+    string prefixStr = null;
+    foreach (string key in prefix.Keys) {
+        if (tableName.StartsWith(key)) {
+            prefixStr = key;
+            break;
+        }
+    }
+    if (!String.IsNullOrEmpty(prefixStr)) {
+        tableName = tableName.Substring(prefixStr.Length, tableName.Length - prefixStr.Length).Trim('_');
+    }
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = true;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+public String ConvertColumnCamel(String tableName) {
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = false;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            builder.Append(ch.ToString());
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+
+public string ConvertColumnType(DbType type) {
+    string typeName = "String";
+    switch (type) {
+        case DbType.Int16:
+        case DbType.Int32:
+        case DbType.Int64:
+        case DbType.Boolean:
+        case DbType.UInt16:
+        case DbType.UInt32:
+        case DbType.UInt64:
+        case DbType.SByte:
+            typeName = "Integer";
+            break;
+        case DbType.String:
+            typeName = "String";
+            break;
+        case DbType.DateTime:
+        case DbType.Date:
+            typeName = "Date";
+            break;
+        case DbType.Decimal:
+            typeName = "BigDecimal";
+            break;
+    }
+    return typeName;
+}
+
+public string GetType(string columnName, string type) {
+    if (columnName.EndsWith("_date")) {
+        return "LocalDate";
+    }
+    string t = "String";
+    switch (type) {
+        case "float":
+            t = "Double";
+            break;
+        case "int":
+        case "intint":
+            t = "Integer";
+            break;
+        default:
+            break;
+    }
+    return t;
+}
+</script>
+package com.frank.stock4j.tusharepro.bean;
+
+import com.frank.stock4j.tusharepro.BaseBean;
+import com.frank.stock4j.tusharepro.http.BaseRequestParam;
+
+/**
+* <%=Description %>
+* @author: codesmith
+**/
+public interface <%=ClassName%>Bean extends BaseBean {
+    String API_NAME = "<%=TableName%>";
+    
+    interface Fields {
+    <%foreach(DataRow row in Columns.Rows){
+        string columnName = row["name"].ToString();
+        string type = row["type"].ToString();
+        string description = row["description"].ToString();
+    %>
+    /*
+    * <%=description %>
+    */
+    String <%=columnName%> = "<%=columnName%>";
+    <%
+    }%>
+    }
+    
+    interface Params {
+    <%foreach(DataRow row in InnerArgs.Rows){
+        string name = row["name"].ToString();
+        string type = row["type"].ToString();
+        string description = row["description"].ToString();
+        %>
+        <%=name %> <%=name %> = new <%=name %>();
+        /*
+        * <%=description %>
+        */
+        class <%=name %> extends BaseRequestParam {
+            { key = "<%=name %>"; }
+        }
+    <%}%>
+    }
+}
