@@ -1,0 +1,108 @@
+﻿<%@ Template Language="C#" TargetLanguage="Text" Encoding="UTF-8" ResponseEncoding="UTF-8"%>
+<%@ Import Namespace="System.Text" %>
+<%@ Import Namespace="System.Collections.Generic" %>
+<%@ Property Name="ClassName" Type="String" Optional="True"%>
+<%@ Property Name="Description" Type="String" Optional="True"%>
+
+<script runat="template">
+public Dictionary<string, string> InitPrefix() {
+    Dictionary<string, string> dic = new Dictionary<string, string>();
+    dic["t_"] = "";
+    dic["c_"] = "";
+    return dic;
+}
+
+// My methods here.
+public String ConvertTableCamel(String tableName) {
+    Dictionary<string, string> prefix = InitPrefix();
+    string prefixStr = null;
+    foreach (string key in prefix.Keys) {
+        if (tableName.StartsWith(key)) {
+            prefixStr = key;
+            break;
+        }
+    }
+    if (!String.IsNullOrEmpty(prefixStr)) {
+        tableName = tableName.Substring(prefixStr.Length, tableName.Length - prefixStr.Length).Trim('_');
+    }
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = true;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+public String ConvertColumnCamel(String tableName) {
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = false;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+
+public string ConvertColumnType(DbType type) {
+    string typeName = "String";
+    switch (type) {
+        case DbType.Int16:
+        case DbType.Int32:
+        case DbType.Int64:
+            typeName = "Integer";
+            break;
+        case DbType.String:
+            typeName = "String";
+            break;
+        case DbType.DateTime:
+        case DbType.Date:
+            typeName = "Date";
+            break;
+        case DbType.Decimal:
+            typeName = "BigDecimal";
+            break;
+    }
+    return typeName;
+}
+</script>
+package com.frank.stock4j.tusharepro.request;
+
+import com.frank.stock4j.tusharepro.entity.<%=ClassName%>Entity;
+import com.frank.stock4j.tusharepro.http.Request;
+
+/*
+* <%=Description%>
+* @author codesmith
+*/
+public class <%=ClassName%>Request extends Request<<%=ClassName%>Entity> {
+}
