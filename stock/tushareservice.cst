@@ -1,8 +1,8 @@
 ﻿<%@ Template Language="C#" TargetLanguage="Text" Encoding="UTF-8" ResponseEncoding="UTF-8"%>
 <%@ Import Namespace="System.Text" %>
 <%@ Import Namespace="System.Collections.Generic" %>
-<%@ Property Name="ClassName" Type="String" Optional="True"%>
 <%@ Property Name="Description" Type="String" Optional="True"%>
+<%@ Property Name="Interfaces" Type="System.Data.DataTable" Optional="True"%>
 
 <script runat="template">
 public Dictionary<string, string> InitPrefix() {
@@ -55,9 +55,7 @@ public String ConvertColumnCamel(String tableName) {
     foreach (char ch in tableName) {
         if (i == tableName.Length - 1) {
             int parse = -1;
-            if (!int.TryParse(ch.ToString(), out parse)) {
-                builder.Append(ch.ToString());
-            }
+            builder.Append(ch.ToString());
         } 
         else if (needUpper) {
             builder.Append(ch.ToString().ToUpper());
@@ -79,6 +77,11 @@ public string ConvertColumnType(DbType type) {
         case DbType.Int16:
         case DbType.Int32:
         case DbType.Int64:
+        case DbType.Boolean:
+        case DbType.UInt16:
+        case DbType.UInt32:
+        case DbType.UInt64:
+        case DbType.SByte:
             typeName = "Integer";
             break;
         case DbType.String:
@@ -94,15 +97,56 @@ public string ConvertColumnType(DbType type) {
     }
     return typeName;
 }
+
+public string GetType(string columnName, string type) {
+    if (columnName.EndsWith("_date")) {
+        return "LocalDate";
+    }
+    string t = "String";
+    switch (type) {
+        case "float":
+            t = "Double";
+            break;
+        case "int":
+        case "intint":
+            t = "Integer";
+            break;
+        default:
+            break;
+    }
+    return t;
+}
 </script>
-package com.frank.stock4j.tusharepro.request;
+package com.frank.stock4j.tusharepro;
 
-import com.frank.stock4j.tusharepro.entity.<%=ClassName%>Entity;
+import com.frank.stock4j.tusharepro.bean.*;
+import com.frank.stock4j.tusharepro.entity.*;
+import com.frank.stock4j.tusharepro.http.Client;
 import com.frank.stock4j.tusharepro.http.Request;
+import com.frank.stock4j.tusharepro.request.*;
+import org.springframework.stereotype.Service;
+import lombok.SneakyThrows;
 
-/*
-* <%=Description%>
-* @author codesmith
-*/
-public class <%=ClassName%>Request extends Request<<%=ClassName%>Entity> {
+import java.io.IOException;
+import java.util.List;
+
+@Service
+public class TushareProService {
+    <%foreach (DataRow row in Interfaces.Rows) {
+        string code = row["code"].ToString();
+        string name = row["name"].ToString();
+        string description = row["description"].ToString();
+        string className = ConvertTableCamel(code);
+        string methodName = ConvertColumnCamel(code);
+        %>
+    /*
+    * <%=name %>
+    * <%=description.Replace("\r\n", "") %>
+    */
+    @SneakyThrows
+    public List<<%=className%>Entity> <%=methodName%>(<%=className%>Request request) {
+        return Client.beanList(request);
+    }
+    
+    <%}%>
 }
