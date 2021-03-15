@@ -2,8 +2,6 @@
 <%@ Import Namespace="System.Text" %>
 <%@ Import Namespace="System.Collections.Generic" %>
 <%@ Property Name="TableName" Type="String" Optional="True"%>
-<%@ Property Name="ClassName" Type="String" Optional="True"%>
-<%@ Property Name="Description" Type="String" Optional="True"%>
 <%@ Property Name="Columns" Type="System.Data.DataTable" Optional="True"%>
 
 <script runat="template">
@@ -120,14 +118,16 @@ public string GetDbType(string columnName, string type) {
     return t;
 }
 </script>
-create table <%=TableName%> (
-    `primary_id` INT(11) NOT NULL AUTO_INCREMENT,
-    <%foreach(DataRow row in Columns.Rows) {
+alter table <%=TableName%> add index idx_<%=TableName%>_primary_key(
+    <%
+        int count = 0;
+        foreach(DataRow row in Columns.Rows) {
         string name = row["name"].ToString();
-        string type = row["type"].ToString();
-        string description = row["description"].ToString().Replace(Environment.NewLine, "");
-        %>
-    `<%=name %>` <%=GetDbType(name, type) %> NULL COMMENT '<%=description%>',
-    <%}%>
-    PRIMARY KEY (`primary_id`)
-)ENGINE=InnoDB COMMENT='<%=Description%>';
+        string required = row["is_primarykey"].ToString();
+        if (required == "1") {
+            if (count == 0) {
+                %><%=name %><%} else {
+                %><%=string.Concat(",", name) %><%}
+            count++;
+        }
+    }%>);

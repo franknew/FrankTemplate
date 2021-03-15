@@ -57,7 +57,12 @@ public String ConvertColumnCamel(String tableName) {
     foreach (char ch in tableName) {
         if (i == tableName.Length - 1) {
             int parse = -1;
-            builder.Append(ch.ToString());
+            if (needUpper) {
+                builder.Append(ch.ToString().ToUpper());
+                needUpper = false;
+            } else {
+                builder.Append(ch.ToString());
+            }
         } 
         else if (needUpper) {
             builder.Append(ch.ToString().ToUpper());
@@ -121,32 +126,20 @@ public string GetType(string columnName, string type) {
 </script>
 package com.frank.tusharepro.core.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
-import javax.persistence.*;
-import java.io.Serializable;
 import java.time.LocalDate;
-import com.frank.stock4j.tusharepro.bean.<%=ConvertTableCamel(TableName)%>Bean;
+import com.frank.stock4j.tusharepro.bean.<%=ClassName%>Bean;
 
 /**
 * <%=Description %>
 * @author: codesmith
 **/
 @Data
-@Entity
-@Table(name = "<%=TableName%>")
-@IdClass(<%=ClassName%>Entity.PrimaryKey.class)
+@TableName("<%=TableName%>")
 public class <%=ClassName%>Entity implements <%=ClassName%>Bean {
-    @Data public static class PrimaryKey implements Serializable {
-        <%for(int i=0; i<Columns.Rows.Count;i++){
-            DataRow row = Columns.Rows[i];
-            string columnName = row["name"].ToString();
-            string type = row["type"].ToString();
-            if (row["is_primarykey"].ToString().Equals("1")) {
-            %>
-        private <%=GetType(columnName, type)%> <%=ConvertColumnCamel(columnName) %>;
-            <%}
-        }%>
-    }
     
     <%for(int i=0; i<Columns.Rows.Count;i++){
         DataRow row = Columns.Rows[i];
@@ -158,8 +151,8 @@ public class <%=ClassName%>Entity implements <%=ClassName%>Bean {
     /*
     * <%=description %>
     */
-    @Id<%}%>
-    @Column(name = "<%=columnName%>") protected <%=GetType(columnName, type)%> <%=ConvertColumnCamel(columnName) %>;
+    @TableId<%}%>
+    @TableField("`<%=columnName%>`") protected <%=GetType(columnName, type)%> <%=ConvertColumnCamel(columnName) %>;
     <%
     }%>
 }

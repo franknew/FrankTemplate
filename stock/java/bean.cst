@@ -5,7 +5,7 @@
 <%@ Property Name="ClassName" Type="String" Optional="True"%>
 <%@ Property Name="Description" Type="String" Optional="True"%>
 <%@ Property Name="Columns" Type="System.Data.DataTable" Optional="True"%>
-<%@ Property Name="InnerArgs" Type="System.Data.DataTable" Optional="True"%>
+<%@ Property Name="InputArgs" Type="System.Data.DataTable" Optional="True"%>
 
 <script runat="template">
 public Dictionary<string, string> InitPrefix() {
@@ -147,7 +147,7 @@ public interface <%=ClassName%>Bean extends BaseBean {
     }
     
     interface Params {
-    <%foreach(DataRow row in InnerArgs.Rows){
+    <%foreach(DataRow row in InputArgs.Rows){
         string name = row["name"].ToString();
         string type = row["type"].ToString();
         string description = row["description"].ToString();

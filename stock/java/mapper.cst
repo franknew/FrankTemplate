@@ -95,9 +95,9 @@ public string ConvertColumnType(DbType type) {
     return typeName;
 }
 </script>
-package com.frank.stock4j.dataloader.reponsitory;
+package com.frank.stock4j.tusharepro.mapper;
 
-import com.frank.stock4j.tusharepro.entity.<%=ClassName%>;
+import com.frank.stock4j.tusharepro.entity.<%=ClassName%>Entity;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
@@ -106,5 +106,5 @@ import org.apache.ibatis.annotations.Mapper;
 * @author codesmith
 */
 @Mapper
-public interface <%=ClassName%>Reponsitory extends BaseMapper<<%=ClassName%>Entity> {
+public class <%=ClassName%>Mapper extends BaseMapper<<%=ClassName%>Entity> {
 }
