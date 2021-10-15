@@ -1,0 +1,482 @@
+﻿<%@ Template Language="C#" TargetLanguage="Java" Encoding="UTF-8" ResponseEncoding="UTF-8"%>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer"%>
+<%@ Import Namespace="System.Text" %>
+<%@ Import Namespace="System.Collections.Generic" %>
+<%@ Property Name="ServiceTable" Type="DataTable" Optional="True"%>
+<%@ Property Name="NatureTable" Type="DataTable" Optional="True"%>
+
+
+<script runat="template">
+// My methods here.
+public String ConvertTableCamel(String tableName) {
+    if (tableName.StartsWith("t_")) {
+        tableName = tableName.TrimStart('t','_').TrimEnd('_');
+    }
+    if (tableName.StartsWith("p_")) {
+        tableName = tableName.TrimStart('p','_').TrimEnd('_');
+    }
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = true;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+public String ConvertColumnCamel(String tableName) {
+    if (tableName.StartsWith("t_")) {
+        tableName = tableName.TrimStart('t','_').TrimEnd('_');
+    }
+    if (tableName.StartsWith("p_")) {
+        tableName = tableName.TrimStart('p','_').TrimEnd('_');
+    }
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = false;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            builder.Append(ch.ToString());
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+
+public string ConvertColumnType(DbType type) {
+    string typeName = "String";
+    switch (type) {
+        case DbType.Int16:
+        case DbType.Int32:
+        case DbType.Int64:
+        case DbType.Boolean:
+        case DbType.UInt16:
+        case DbType.UInt32:
+        case DbType.UInt64:
+        case DbType.SByte:
+            typeName = "Integer";
+            break;
+        case DbType.String:
+            typeName = "String";
+            break;
+        case DbType.DateTime:
+        case DbType.Date:
+            typeName = "Date";
+            break;
+        case DbType.Decimal:
+            typeName = "BigDecimal";
+            break;
+    }
+    return typeName;
+}
+
+public string buildClassName(string name, string ext) {
+    return ConvertTableCamel(name) + ext;
+}
+
+public string buildMethodName(string name, string ext) {
+    return ConvertColumnCamel(name) + ext;
+}
+</script>
+<%
+    DataRow[] listRows = ServiceTable.Select("type=0");
+    DataRow[] addRows = ServiceTable.Select("type=1");
+    DataRow[] editRows = ServiceTable.Select("type=2");
+    DataRow[] viewRows = ServiceTable.Select("type=3");
+    DataRow[] auditRows = ServiceTable.Select("type=4");
+    DataRow[] deleteRows = ServiceTable.Select("type=5");
+    Dictionary<string, string> dataDic = new Dictionary<string, string>();
+    DataRow[] dataDicRows = NatureTable.Select("data_dic_code is not null and data_dic_code<>''");
+    foreach (DataRow mappingRow in dataDicRows) {
+        if (!dataDic.ContainsKey(mappingRow["data_dic_code"].ToString())) {
+            dataDic[mappingRow["data_dic_code"].ToString()] = mappingRow["data_dic_code"].ToString();
+        }
+    }
+
+%>
+<template>
+<div class="client-manager-box">
+    <commonSearch
+      ref="searchRef"
+      :data="filterInfo.queryModel"
+      :field-list="filterInfo.queryModelType"
+      :list-type-info="listTypeInfo"
+      :count='filterInfo.count'
+      :catalogProductFlag="false"
+      :exportBtnFlag="false"
+      :remote="true"
+      class="creditRecordSearchBar"
+      @handleFilter="list"
+      @handleReset="handleReset"
+    />
+    <commonTable
+      :columns="columns"
+      :data="tableData"
+      :pager="page"
+      :paginationBoxReflow="paginationBoxReflow"
+      @handleSizeChange="handleSizeChange"
+      @handleCurrentChange="handleCurrentChange"
+    >
+        <el-table-column
+        slot="table_oper"
+        align="center"
+        label="操作"
+        width="160"
+        :resizable="false"
+      >
+        <template slot-scope="scope">
+          <div class="operationBtn">
+            <%if (viewRows != null && viewRows.Length > 0) {%>
+            <a class="operationBtn_span" @click="doView(scope.$index, scope.row,1)">详细</a>
+            <%} %>
+            <%if (editRows != null && editRows.Length > 0) {%>
+            <a class="operationBtn_span" @click="doEdit(scope.$index, scope.row)" v-if="!scope.row.inEdit">编辑</a>
+            <a class="operationBtn_span" @click="doSave(scope.$index, scope.row)" v-if="scope.row.inEdit">保存</a>
+            <a class="operationBtn_span" @click="cancelEdit(scope.$index, scope.row)" v-if="scope.row.inEdit">取消</a>
+            <%} %>
+            <%if (auditRows != null && auditRows.Length > 0) {%>
+            <a class="operationBtn_span" @click="doAudit(scope.$index, scope.row)">审核</a>
+            <%} %>
+            <%if (deleteRows != null && deleteRows.Length > 0) {%>
+            <a class="operationBtn_span" @click="doDelete(scope.$index, scope.row)">删除</a>
+            <%} %>
+          </div>
+        </template>
+      </el-table-column>
+    </commonTable>
+    
+    <%if (viewRows != null && viewRows.Length > 0) {
+    %><%="<" + buildClassName(viewRows[0]["service_code"].ToString(),viewRows[0]["action_mapping"].ToString())%> ref="<%=buildMethodName(viewRows[0]["service_code"].ToString(),viewRows[0]["action_mapping"].ToString())%>Ref"/><%} %>
+    <%if (editRows != null && editRows.Length > 0) {
+    %><%="<" + buildClassName(editRows[0]["service_code"].ToString(),editRows[0]["action_mapping"].ToString())%> ref="<%=buildMethodName(editRows[0]["service_code"].ToString(),editRows[0]["action_mapping"].ToString())%>Ref"
+    <%  DataTable editnatures = editRows[0]["natures"] as DataTable;
+        DataRow[] editDicRows = editnatures.Select("data_dic_code is not null and data_dic_code<>''"); 
+        foreach (DataRow row in editDicRows) {%>
+        :<%=row["data_dic_code"].ToString()%>="<%=buildMethodName(row["data_dic_code"].ToString(), "") %>"
+        <%}%>
+    /><%
+    } %>
+    <%if (auditRows != null && auditRows.Length > 0) {
+    %><%="<" + buildClassName(auditRows[0]["service_code"].ToString(),auditRows[0]["action_mapping"].ToString())%> ref="<%=buildMethodName(auditRows[0]["service_code"].ToString(),auditRows[0]["action_mapping"].ToString())%>Ref"/><%
+    } %>
+</div>
+</template>
+<script>
+import commonTable from '@/components/commonTable/commonTable'
+import commonSearch from '@/components/commonSearch/commonSearch'
+import api from "@/api/<%=ServiceTable.TableName%>.js"
+import dataDicApi from "@/api/datadic.js"
+<%if (viewRows != null && viewRows.Length > 0) {
+%>import <%=buildClassName(viewRows[0]["service_code"].ToString(),viewRows[0]["action_mapping"].ToString())%> from '@<%=buildClassName(viewRows[0]["service_code"].ToString(),viewRows[0]["action_mapping"].ToString())%>.vue'<%
+} %>
+<%if (editRows != null && editRows.Length > 0) {
+%>import <%=buildClassName(editRows[0]["service_code"].ToString(),editRows[0]["action_mapping"].ToString())%> from '@<%=buildClassName(editRows[0]["service_code"].ToString(),editRows[0]["action_mapping"].ToString())%>.vue'<%
+} %>
+<%if (auditRows != null && auditRows.Length > 0) {
+%>import <%=buildClassName(auditRows[0]["service_code"].ToString(),auditRows[0]["action_mapping"].ToString())%> from '@<%=buildClassName(auditRows[0]["service_code"].ToString(),auditRows[0]["action_mapping"].ToString())%>.vue'<%
+} %>
+export default {
+    name: "<%=ServiceTable.TableName%>",
+    components: {
+        commonTable,
+        commonSearch,
+        <%if (viewRows != null && viewRows.Length > 0) {
+        %><%=buildClassName(viewRows[0]["service_code"].ToString(),viewRows[0]["action_mapping"].ToString())%>,<%
+        } %>
+        <%if (editRows != null && editRows.Length > 0) {
+        %><%=buildClassName(editRows[0]["service_code"].ToString(),editRows[0]["action_mapping"].ToString())%>,<%
+        } %>
+        <%if (auditRows != null && auditRows.Length > 0) {
+        %><%=buildClassName(auditRows[0]["service_code"].ToString(),auditRows[0]["action_mapping"].ToString())%>,<%
+        } %>
+    },
+    props: {
+    },
+    data() {
+        return {
+            filterInfo: {
+                searchClumns: {
+                <% if (listRows != null && listRows.Length > 0) {
+                    DataTable natures = listRows[0]["natures"] as DataTable;
+                    DataRow[] displayRows = natures.Select("arg_type=1 and display=1");
+                    foreach (DataRow displayRow in displayRows) {
+                    %>
+                    <%=displayRow["nature_code"].ToString()%>: null,
+                    <%}
+                }%>
+                },
+                queryModel: {
+                <% if (listRows != null && listRows.Length > 0) {
+                    DataTable natures = listRows[0]["natures"] as DataTable;
+                    DataRow[] displayRows = natures.Select("arg_type=1 and display=1");
+                    foreach (DataRow displayRow in displayRows) {
+                    %>
+                    <%=displayRow["nature_code"].ToString()%>: "",
+                    <%}
+                }%>
+                },
+                queryModelType: [
+                <% if (listRows != null && listRows.Length > 0) {
+                    DataTable natures = listRows[0]["natures"] as DataTable;
+                    DataRow[] displayRows = natures.Select("arg_type=1 and display=1");
+                    foreach (DataRow displayRow in displayRows) {
+                    %>
+                    {
+                        label: '<%=displayRow["nature_name"].ToString()%>',
+                        value: '<%=displayRow["nature_code"].ToString()%>',
+                        <%
+                        int? type=displayRow["arg_type"] as int? ;
+                        switch (type) {
+                            case 2:%>
+                        type: 'date',
+                        dateType: 'daterange',
+                                <%break;
+                            case 3:%>
+                        type: 'select',
+                        list: '<%=buildMethodName(displayRow["nature_code"].ToString(), "")%>_bind',
+                                <%break;
+                            default:%>
+                        type: 'input',
+                                <%break;
+                        }
+                        %>
+                    },
+                    <%}
+                }%>
+                ],
+                /**搜索/重置区域是否隐藏 */
+                btnHidden: true,
+                /**组件尺寸 */
+                // size: 'small',
+                /**默认展示搜索条件 */
+                count: 3,
+                /**label/item 宽度 */
+                width: {
+                  labelWidth: 110,
+                  itemWidth: 220
+                },
+            },
+            
+            newModel: {
+            <% if (listRows != null && listRows.Length > 0) {
+                DataTable natures = listRows[0]["natures"] as DataTable;
+                DataRow[] displayRows = natures.Select("arg_type=2 and display=1");
+                foreach (DataRow displayRow in displayRows) {
+                %>
+                <%=displayRow["nature_code"].ToString()%>: "",
+                <%}
+            }%>
+            },
+            columns: [
+            <% if (listRows != null && listRows.Length > 0) {
+                DataTable natures = listRows[0]["natures"] as DataTable;
+                DataRow[] displayRows = natures.Select("arg_type=2 and display=1");
+                foreach (DataRow displayRow in displayRows) {
+                %>
+                { prop: '<%=displayRow["nature_code"].ToString()%>', label: '<%=displayRow["nature_name"].ToString()%>', align: 'center', width: '' },
+                <%}
+            }%>
+            ],
+            tableData: [
+            ],
+            
+            deleteVisible: false,
+            viewData: {},
+            canEdit: true,
+            pageSize: 10,
+            pageIndex: 1,
+            total: 1,
+            editList: [],
+            auditVisible: false,
+            listTypeInfo: {
+            <%foreach (var key in dataDic.Keys) {%>
+                <%=buildMethodName(key, "")%>_bind: [{id:null, name:"全部"}],
+            <%} %>
+            },
+            <%foreach (var key in dataDic.Keys) {%>
+            <%=buildMethodName(key, "")%>: [],
+            <%=buildMethodName(key, "")%>_map: {},
+            <%} %>
+            page: {
+                page: 1,//当前页
+                pageSize: 10,//当前显示页数
+                sizes: [10, 20, 30, 40],//分页条数设置
+                total: 0//总页数
+              },//表格中的分页
+            paginationBoxReflow: true,
+            editObj: {
+            },
+        }
+    },
+    mounted() {
+        this.list();
+        <%foreach (var key in dataDic.Keys) {%>
+        dataDicApi.getList({code: "<%=key %>"}).then(t=> {
+            if (t.code != 200) {
+                return;
+            }
+            this.<%=buildMethodName(key, "")%> = t.data;
+            for (var i = 0; i < t.data.length; i++) {
+                this.<%=buildMethodName(key, "")%>_map[t.data[i].value] = t.data[i].name;
+                <%=buildMethodName(key, "")%>_bind.push({id: t.data[i].value, name: t.data[i].name});
+            }
+        });
+        <%} %>
+    },
+    methods: {
+        doDelete(index, row) {
+            this.$confirm('确认删除？').then(_ => {
+            <%if (deleteRows != null && deleteRows.Length > 0) {%>
+                api.<%=buildMethodName(deleteRows[0]["service_code"].ToString(), deleteRows[0]["action_mapping"].ToString()) %>(row).then(t=>{
+                    if (t.code != 200) {
+                        return;
+                    }
+                    this.list.splice(index, 1);
+                    //弹出确认框
+                    this.$message('删除成功！');
+                });
+            <%}%>
+            })
+              .catch(_ => {});
+        },
+        doView(index, row) {
+            <%if (viewRows != null && viewRows.Length > 0) {%>
+            this.$refs.<%=buildMethodName(viewRows[0]["service_code"].ToString(),viewRows[0]["action_mapping"].ToString())%>Ref.show(row);
+            <%} %>
+        },
+        doEdit(index, row) {
+            <%if (editRows != null && editRows.Length > 0) {
+                DataRow row = editRows[0];
+                int? canEdit = row["can_edit"] as int?;
+                if (canEdit == 1) {%>
+            this.editObj = JSON.parse(JSON.stringify(row));
+            row.inEdit = true;
+            <%  } else {%>
+            this.$refs.<%=buildMethodName(editRows[0]["service_code"].ToString(),editRows[0]["action_mapping"].ToString())%>Ref.show(row);
+            <%} 
+            }%>
+        },
+        cancelEdit(index, row) {
+            row = JSON.parse(JSON.stringify(this.editObj));
+            this.editObj = {};
+            row.inEdit = false;
+        },
+        doAudit(index, row) {
+            <%if (auditRows != null && auditRows.Length > 0) {%>
+            this.$refs.<%=buildMethodName(auditRows[0]["service_code"].ToString(),auditRows[0]["action_mapping"].ToString())%>Ref.show(row);
+            <%} %>
+        },
+        doSave(index, row) {
+            <%if (editRows != null && editRows.Length > 0) {
+                DataRow row = editRows[0];%>
+            api.<%=buildMethodName(row["service_code"].ToString(), row["action_mapping"].ToString()) %>(row).then(t=> {
+                if (t.code != 200) {
+                    return;
+                }
+                this.row.inEdit = false;
+                this.$message('保存成功！');
+            });
+            <%}%>
+        },
+        doAdd() {
+            <%if (editRows != null && editRows.Length > 0) {%>
+            this.$refs.<%=buildMethodName(editRows[0]["service_code"].ToString(),editRows[0]["action_mapping"].ToString())%>Ref.show(this.newModel);
+            <%} %>
+        },
+        list() {
+            this.innerList(1);
+        },
+        innerList(currentPage) {
+            this.pageIndex = currentPage;
+            <%if (listRows != null && listRows.Length > 0) {%>
+            api.<%=buildMethodName(listRows[0]["service_code"].ToString(), listRows[0]["action_mapping"].ToString()) %>({...this.queryModel, pagenum: this.pageIndex, pagesize: this.pageSize}).then(t=>{
+                if (t.code != 200) {
+                    return;
+                }
+                this.tableData = t.data;
+                for (var i = 0; i < this.tableData.length; i++) {
+                    this.tableData[i].inEdit = false;
+                    <% DataTable natures = listRows[0]["natures"] as DataTable;
+                        foreach (DataRow natureRow in natures.Rows) {
+                            string dataDicCode = natureRow["data_dic_code"].ToString();
+                            if (!string.IsNullOrEmpty(dataDicCode)) {%>
+                    this.tableData[i].<%=natureRow["nature_code"].ToString()%>_name = this.<%=buildMethodName(dataDicCode, "") %>[this.tableData[i].<%=natureRow["nature_code"].ToString()%>];
+                    <%      } 
+                        }%>
+                }
+                if (t.data.length > 0) {
+                    this.total = t.data[0].wrowcount;
+                }
+            });
+            <%}%>
+            
+        },
+        handleSizeChange(pageSize) {
+            this.pageSize = pageSize;
+            this.list();
+        },
+        handleCurrentChange(index) {
+            this.innerList(index);
+        },
+        openAudit(row) {
+            <%if (auditRows != null && auditRows.Length > 0) {%>
+            this.$refs.<%=buildMethodName(auditRows[0]["service_code"].ToString(),auditRows[0]["action_mapping"].ToString())%>Ref.show(row);
+            <%} %>
+        },
+        closeAudit() {
+            <%if (auditRows != null && auditRows.Length > 0) {%>
+            this.$refs.<%=buildMethodName(auditRows[0]["service_code"].ToString(),auditRows[0]["action_mapping"].ToString())%>Ref.close();
+            <%} %>
+        },
+        handleReset() {
+            this.queryModel = {
+            <% if (listRows != null && listRows.Length > 0) {
+                DataTable natures = listRows[0]["natures"] as DataTable;
+                DataRow[] displayRows = natures.Select("arg_type=1 and display=1");
+                foreach (DataRow displayRow in displayRows) {
+                %>
+                <%=displayRow["nature_code"].ToString()%>: "",
+                <%}
+            }%>
+            };
+        },
+    },
+};
+</script>
+
+<style lang="scss" scoped>
+.client-manager-box {
+  .operationBtn {
+    .operationBtn_span {
+      margin-right: 10px;
+      color: rgb(64, 158, 255);
+    }
+  }
+}
+</style>
+

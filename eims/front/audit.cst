@@ -1,0 +1,217 @@
+﻿<%@ Template Language="C#" TargetLanguage="Java" Encoding="UTF-8" ResponseEncoding="UTF-8"%>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer"%>
+<%@ Import Namespace="System.Text" %>
+<%@ Property Name="NatureTable" Type="DataTable" Optional="True"%>
+<%@ Property Name="ServiceCode" Type="System.String" %>
+<%@ Property Name="ServiceName" Type="System.String" %>
+<%@ Property Name="ActionMapping" Type="System.String" %>
+<%@ Property Name="MenuCode" Type="System.String" %>
+
+<script runat="template">
+// My methods here.
+public String ConvertTableCamel(String tableName) {
+    if (tableName.StartsWith("t_")) {
+        tableName = tableName.TrimStart('t','_').TrimEnd('_');
+    }
+    if (tableName.StartsWith("p_")) {
+        tableName = tableName.TrimStart('p','_').TrimEnd('_');
+    }
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = true;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+public String ConvertColumnCamel(String tableName) {
+    if (tableName.StartsWith("t_")) {
+        tableName = tableName.TrimStart('t','_').TrimEnd('_');
+    }
+    if (tableName.StartsWith("p_")) {
+        tableName = tableName.TrimStart('p','_').TrimEnd('_');
+    }
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = false;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            builder.Append(ch.ToString());
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+
+public string ConvertColumnType(DbType type) {
+    string typeName = "String";
+    switch (type) {
+        case DbType.Int16:
+        case DbType.Int32:
+        case DbType.Int64:
+        case DbType.Boolean:
+        case DbType.UInt16:
+        case DbType.UInt32:
+        case DbType.UInt64:
+        case DbType.SByte:
+            typeName = "Integer";
+            break;
+        case DbType.String:
+            typeName = "String";
+            break;
+        case DbType.DateTime:
+        case DbType.Date:
+            typeName = "Date";
+            break;
+        case DbType.Decimal:
+            typeName = "BigDecimal";
+            break;
+    }
+    return typeName;
+}
+
+public string buildClassName(string name, string ext) {
+    return ConvertTableCamel(name) + ext;
+}
+
+public string buildMethodName(string name, string ext) {
+    return ConvertColumnCamel(name) + ext;
+}
+</script>
+<%
+    DataRow[] displayRows = NatureTable.Select("arg_type=1");
+    DataRow[] dataDicRows = NatureTable.Select("data_dic_code is not null and data_dic_code<>''");
+
+%>
+<template>
+<div>
+  <el-row>
+    <el-col :span="1"><span class="title">基本信息</span></el-col>
+    <el-col :span="3"></el-col>
+    <el-col :span="1" @click="save" v-show="showNeedSave()"><el-button>保存</el-button></el-col>
+    <el-col :span="1" @click="submitAudit" v-show="showNeedSubmit()"><el-button>提交审核</el-button></el-col>
+    <el-col :span="1" @click="approve" v-show="showNeedAudit()"><el-button>审核通过</el-button></el-col>
+    <el-col :span="1" @click="reject" v-show="showNeedAudit()"><el-button>驳回</el-button></el-col>
+  </el-row>
+  <hr>
+  <el-form :model="model">
+  <% foreach (DataRow displayRow in displayRows) {%>
+    <el-form-item label="<%=displayRow["nature_name"].ToString()%>">
+    <% if (!string.IsNullOrEmpty(displayRow["data_dic_code"].ToString())) {%>
+        <el-select filterable clearable  v-model="model.<%=displayRow["nature_code"].ToString()%>">
+            <el-option v-for="(item,index) in <%=displayRow["data_dic_code"].ToString()%>" :key="index" :label="item.name" :value="item.value" />
+        </el-select>
+    <%}
+    else if (displayRow["nature_code"].ToString().EndsWith("date")) {%>
+        <el-date-picker v-model="model.<%=displayRow["nature_code"].ToString()%>" type="date" />
+    <%}
+    else {%>
+        <el-input v-model="model.<%=displayRow["nature_code"].ToString()%>" autocomplete="off" />
+    <%}%>
+    </el-form-item>
+  <%}%>
+  </el-form>
+</div>
+</template>
+
+<script>
+import api from "@/api/<%=MenuCode%>.js"
+export default {
+    name: "<%=ServiceCode%>_audit",
+    props: {
+        model: Object,
+        <%foreach (DataRow row in dataDicRows) {%>
+        <%=row["data_dic_code"].ToString() %>: Array,
+        <%} %>
+    },
+    data() {
+        return {
+            model: {
+  <% foreach (DataRow displayRow in displayRows) {%>
+                <%=displayRow["nature_code"].ToString() %>: "",
+  <%}%>
+            },
+            dialogFormVisible: false,
+        }
+    },
+    methods: {
+        close() {
+            dialogFormVisible = false;
+        },
+        show(data) {
+            this.model = data;
+            dialogFormVisible = true;
+        },
+        save(row) {
+            this.model = row;
+            api.<%=buildMethodName(ServiceCode, ActionMapping) %>(row).then(t=> {
+                if (t != 200) {
+                    return;
+                }
+                this.$message('保存成功！');
+            });
+        },
+        approve() {
+            this.audit(2);
+        },
+        reject() {
+            this.audit(3);
+        },
+        submitAudit() {
+            this.audit(1);
+        },
+        showNeedAudit() {
+            return this.model.stat == 1;
+        },
+        showNeedSave() {
+            return this.model.stat == 0 || this.model.stat == 3;
+        },
+        showNeedSubmit() {
+            return this.model.stat == 0;
+        },
+        audit(status) {
+            api.<%=buildMethodName(ServiceCode, ActionMapping)%>(...this.model, stat: status).then(t=> {
+                if (t.code != 200) {
+                    return;
+                }
+                this.model.stat = status;
+            });
+        },
+    }
+}
+
+</script>
+
+<style lang="less">
+.title {
+    font-size: 20px;
+}
+.save-button {
+}
+</style>

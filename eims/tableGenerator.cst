@@ -1,0 +1,310 @@
+﻿<%@ Template Language="C#" TargetLanguage="C#" Encoding="UTF-8" ResponseEncoding="UTF-8" Debug="True"%>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Assembly Name="MySql.Data" %>
+<%@ Assembly Name="SOAFramework.Library.DAL" %>
+<%@ Assembly Name="SOAFramework.Library.SimpleLogger" %>
+<%@ Import Namespace="System.Collections.Generic" %>
+<%@ Import Namespace="System.IO" %>
+<%@ Import Namespace="SchemaExplorer"%>
+<%@ Import Namespace="System.Text" %>
+<%@ Import Namespace="SOAFramework.Library.DAL"%>
+<%@ Import Namespace="SOAFramework.Library"%>
+<%@ Property Name="NameSpace" Type="System.String" Default="com.xcd.eims" %>
+<%@ Property Name="Output" Type="System.String" Default="D:\\template\\output\\" %>
+<%@ Property Name="ConnectionString" Type="System.String" Default="server=122.9.150.67;uid=sa;pwd=cuowu.1314;database=codegen;" %>
+<%@ Register Name="xml" Template="server/xml.cst" %>
+<%@ Register Name="entity" Template="server/entity.cst" %>
+<%@ Register Name="mapper" Template="server/mapper.cst" %>
+<%@ Register Name="request" Template="server/request.cst" %>
+<%@ Register Name="service" Template="server/service.cst" %>
+<%@ Register Name="controller" Template="server/controller.cst" %>
+<%@ Register Name="list" Template="front/list.cst" %>
+<%@ Register Name="view" Template="front/view.cst" %>
+<%@ Register Name="edit" Template="front/edit.cst" %>
+<%@ Register Name="audit" Template="front/audit.cst" %>
+<%@ Register Name="api" Template="front/api.cst" %>
+
+<script runat="template">
+
+SimpleLogger logger = new SimpleLogger("D:\\");
+// My methods here.
+public String ConvertTableCamel(String tableName) {
+    if (tableName.StartsWith("p_")) {
+        tableName = tableName.TrimStart('p','_').TrimEnd('_');
+    }
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = true;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+public String ConvertColumnCamel(String tableName) {
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = false;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+public string ConvertColumnType(DbType type) {
+    string typeName = "String";
+    switch (type) {
+        case DbType.Int16:
+        case DbType.Int32:
+        case DbType.Int64:
+            typeName = "Integer";
+            break;
+        case DbType.String:
+            typeName = "String";
+            break;
+        case DbType.DateTime:
+        case DbType.Date:
+            typeName = "Date";
+            break;
+        case DbType.Decimal:
+            typeName = "BigDecimal";
+            break;
+    }
+    return typeName;
+}
+
+public void RenderToFile(CodeTemplate template, string fileName) {
+    fileName = fileName.Replace("\n", "");
+    FileInfo fi = new FileInfo(fileName);
+    if (fi.Exists) {
+        fi.Delete();
+    }
+    if (!fi.Directory.Exists) {
+        fi.Directory.Create();
+    }
+    string code = template.RenderToString();
+    System.Console.WriteLine(code);
+    // 使用UTF-8格式写文件
+    using (FileStream fs = new FileStream(fileName, FileMode.Create, FileAccess.Write))
+    {
+        using (StreamWriter sw = new StreamWriter(fs, new System.Text.UTF8Encoding(false))) // false表示使用UTF-8格式。
+        {
+            sw.Write(code);
+            sw.Flush();
+            fs.Flush();
+        }
+    }
+}
+
+public string buildClassName(string name, string ext) {
+    return ConvertTableCamel(name) + ext;
+}
+
+public string buildMethodName(string name, string ext) {
+    return ConvertColumnCamel(name) + ext;
+}
+
+public DataTable run() {
+    IDBHelper helper = DBFactory.CreateDBHelper(ConnectionString, "MSSQL2005P");
+    StringBuilder menuSql = new StringBuilder();
+    menuSql.AppendFormat("select * from menu");
+    DataTable menuTable = helper.GetTableWithSQL(menuSql.ToString());
+    menuTable.Columns.Add(new DataColumn("services", typeof(DataTable)));
+    String serviceSql = "select * from service";
+    DataTable serviceTable = helper.GetTableWithSQL(serviceSql);
+    
+    String natureSql = "select * from nature order by sort asc";
+    DataTable natureTable = helper.GetTableWithSQL(natureSql);
+    //System.Diagnostics.Debugger.Launch();
+    //System.Diagnostics.Debugger.Break(); 
+    foreach (DataRow menurow in menuTable.Rows) {
+        int? menuId = menurow["id"] as int?;
+        string menuCode = menurow["menu_code"].ToString();
+        DataRow[] serviceRows = serviceTable.Select("menu_id=" + menuId.ToString());
+        serviceTable.TableName = menuCode;
+        DataTable serviceTableTemp = serviceTable.Clone();
+        foreach (DataRow row in serviceRows) {
+            serviceTableTemp.ImportRow(row);
+        }
+        serviceTableTemp.Columns.Add(new DataColumn("natures", typeof(DataTable)));
+        string path = Output + "\\";
+        foreach (DataRow servicerow in serviceTableTemp.Rows) {
+            int? serviceId = servicerow["id"] as int?;
+            string serviceCode = servicerow["service_code"].ToString();
+            string serviceName = servicerow["service_name"].ToString();
+            string mapping = servicerow["action_mapping"].ToString();
+            int? type = servicerow["type"] as int?;
+            DataRow[] natureRows = natureTable.Select("service_id=" + serviceId);
+            natureTable.TableName = serviceCode;
+            DataTable natureTableTemp = natureTable.Clone();
+            foreach (DataRow dr in natureRows) {
+                natureTableTemp.ImportRow(dr);
+            }
+            servicerow["natures"] = natureTableTemp;
+            RenderEntity(natureTableTemp, path, serviceCode, mapping);
+            RenderRequest(natureTableTemp, path, serviceCode, mapping);
+            RenderFrontTemplate(natureTableTemp, path, serviceCode, mapping, serviceName, type, menuCode);
+        }
+        RenderAll(serviceTableTemp, natureTable, path, menuCode);
+        
+        menurow["services"] = serviceTable;
+    }
+    return menuTable;
+}
+
+public void RenderTemplate(CodeTemplate template, string path) {
+    template.SetProperty("NameSpace", NameSpace);
+    RenderToFile(template, path);
+}
+
+public void RenderAll(DataTable serviceTable, DataTable natureTable, string path, string serviceCode) {
+    RenderXml(serviceTable, path, serviceCode);
+    RenderMapper(serviceTable, path, serviceCode);
+    RenderService(serviceTable, path, serviceCode);
+    RenderController(serviceTable, path, serviceCode);
+    RenderList(serviceTable, natureTable, path, serviceCode);
+    RenderApi(serviceTable, path, serviceCode);
+}
+
+public void RenderXml(DataTable serviceTable, string path, string serviceCode) {
+    path += "server\\\\xml\\\\" + serviceCode + ".xml";
+    CodeTemplate xml = new xml();
+    xml.SetProperty("ServiceTable", serviceTable);
+    RenderTemplate(xml, path);
+}
+
+public void RenderEntity(DataTable natureTable, string path, string serviceCode, string mapping) {
+    path += "server\\\\entity\\\\" + buildClassName(serviceCode, mapping) + ".java";
+    CodeTemplate entity = new entity();
+    entity.SetProperty("NatureTable", natureTable);
+    entity.SetProperty("ServiceCode", serviceCode);
+    entity.SetProperty("Mapping", mapping);
+    RenderTemplate(entity, path);
+}
+
+public void RenderRequest(DataTable natureTable, string path, string serviceCode, string mapping) {
+    path += "server\\\\request\\\\" + buildClassName(serviceCode, mapping) + "Request.java";
+    CodeTemplate request = new request();
+    request.SetProperty("NatureTable", natureTable);
+    request.SetProperty("ServiceCode", serviceCode);
+    request.SetProperty("Mapping", mapping);
+    RenderTemplate(request, path);
+}
+
+public void RenderMapper(DataTable serviceTable, string path, string serviceCode) {
+    path += "server\\\\mapper\\\\" + serviceCode + "Mapper.java";
+    CodeTemplate mapper = new mapper();
+    mapper.SetProperty("ServiceTable", serviceTable);
+    RenderTemplate(mapper, path);
+}
+
+public void RenderService(DataTable serviceTable, string path, string serviceCode) {
+    path += "server\\\\service\\\\" + serviceCode + "Service.java";
+    CodeTemplate template = new service();
+    template.SetProperty("ServiceTable", serviceTable);
+    RenderTemplate(template, path);
+}
+public void RenderController(DataTable serviceTable, string path, string serviceCode) {
+    path += "server\\\\contrller\\\\" + serviceCode + "Controller.java";
+    CodeTemplate template = new controller();
+    template.SetProperty("ServiceTable", serviceTable);
+    RenderTemplate(template, path);
+}
+
+public void RenderList(DataTable serviceTable, DataTable natureTable, string path, string serviceCode) {
+    path += "front\\\\list\\\\" + serviceCode + ".vue";
+    CodeTemplate template = new list();
+    template.SetProperty("ServiceTable", serviceTable);
+    template.SetProperty("NatureTable", natureTable);
+    RenderTemplate(template, path);
+}
+public void RenderView(DataTable natureTable, string path, string serviceCode, string mapping, string serviceName) {
+    path += "front\\\\view\\\\" + buildClassName(serviceCode, mapping) + ".vue";
+    CodeTemplate template = new view();
+    template.SetProperty("NatureTable", natureTable);
+    template.SetProperty("ServiceName", serviceName);
+    template.SetProperty("ServiceCode", serviceCode);
+    RenderTemplate(template, path);
+}
+public void RenderApi(DataTable serviceTable, string path, string serviceCode) {
+    path += "front\\\\api\\\\" + serviceTable.TableName + ".js";
+    CodeTemplate template = new api();
+    template.SetProperty("ServiceTable", serviceTable);
+    RenderTemplate(template, path);
+}
+public void RenderEdit(DataTable natureTable, string path, string serviceCode, string mapping, string serviceName, string menuCode) {
+    path += "front\\\\edit\\\\" + buildClassName(serviceCode, mapping) + ".vue";
+    CodeTemplate template = new edit();
+    template.SetProperty("NatureTable", natureTable);
+    template.SetProperty("ServiceName", serviceName);
+    template.SetProperty("ServiceCode", serviceCode);
+    template.SetProperty("MenuCode", menuCode);
+    template.SetProperty("ActionMapping", mapping);
+    RenderTemplate(template, path);
+}
+public void RenderAudit(DataTable natureTable, string path, string serviceCode, string mapping, string serviceName, string menuCode) {
+    path += "front\\\\audit\\\\" + buildClassName(serviceCode, mapping) + ".vue";
+    CodeTemplate template = new audit();
+    template.SetProperty("NatureTable", natureTable);
+    template.SetProperty("ServiceName", serviceName);
+    template.SetProperty("ServiceCode", serviceCode);
+    template.SetProperty("MenuCode", menuCode);
+    template.SetProperty("ActionMapping", mapping);
+    RenderTemplate(template, path);
+}
+
+public void RenderFrontTemplate(DataTable serviceTable, string path, string serviceCode, string mapping, string serviceName, int? type, string menuCode) {
+    switch(type) {
+        case 0:
+            break;
+        case 1:
+            break;
+        case 2:
+            RenderEdit(serviceTable, path, serviceCode, mapping, serviceName, menuCode);
+            break;
+        case 3:
+            RenderView(serviceTable, path, serviceCode, mapping, serviceName);
+            break;
+        case 4:
+            RenderAudit(serviceTable, path, serviceCode, mapping, serviceName, menuCode);
+            break;
+        case 5:
+            break;
+    }
+}
+
+public String buildPath(string path, string module) {
+    return path + module + "\\";
+}
+</script>
+<%
+run();
+%>

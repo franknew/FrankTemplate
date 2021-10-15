@@ -1,0 +1,155 @@
+﻿<%@ Template Language="C#" TargetLanguage="Java" Encoding="UTF-8" ResponseEncoding="UTF-8"%>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer"%>
+<%@ Import Namespace="System.Text" %>
+<%@ Property Name="ServiceTable" Type="DataTable" Optional="True"%>
+<%@ Property Name="NameSpace" Type="System.String" Default="com.xcd.eims" %>
+
+<script runat="template">
+// My methods here.
+public String ConvertTableCamel(String tableName) {
+    if (tableName.StartsWith("t_")) {
+        tableName = tableName.TrimStart('t','_').TrimEnd('_');
+    }
+    if (tableName.StartsWith("p_")) {
+        tableName = tableName.TrimStart('p','_').TrimEnd('_');
+    }
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = true;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+public String ConvertColumnCamel(String tableName) {
+    if (tableName.StartsWith("t_")) {
+        tableName = tableName.TrimStart('t','_').TrimEnd('_');
+    }
+    if (tableName.StartsWith("p_")) {
+        tableName = tableName.TrimStart('p','_').TrimEnd('_');
+    }
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = false;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            builder.Append(ch.ToString());
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+
+public string ConvertColumnType(DbType type) {
+    string typeName = "String";
+    switch (type) {
+        case DbType.Int16:
+        case DbType.Int32:
+        case DbType.Int64:
+        case DbType.Boolean:
+        case DbType.UInt16:
+        case DbType.UInt32:
+        case DbType.UInt64:
+        case DbType.SByte:
+            typeName = "Integer";
+            break;
+        case DbType.String:
+            typeName = "String";
+            break;
+        case DbType.DateTime:
+        case DbType.Date:
+            typeName = "Date";
+            break;
+        case DbType.Decimal:
+            typeName = "BigDecimal";
+            break;
+    }
+    return typeName;
+}
+
+public string buildClassName(string name, string ext) {
+    return ConvertTableCamel(name) + ext;
+}
+
+public string buildMethodName(string name, string ext) {
+    return ConvertColumnCamel(name) + ext;
+}
+</script>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="<%=NameSpace%>.mapper.<%=ServiceTable.TableName%>Mapper">
+    <% foreach (DataRow row in ServiceTable.Rows) {
+        DataTable natureTable = row["natures"] as DataTable;
+        String serviceName = row["service_name"].ToString();
+        String serviceCode = row["service_code"]?.ToString();
+        String mapping = row["action_mapping"].ToString();
+    //System.Diagnostics.Debugger.Launch();
+    //System.Diagnostics.Debugger.Break(); 
+        int? type = row["type"] as int?;
+        switch (type) {
+            case 0:%>
+        <select id="<%=buildMethodName(serviceCode, mapping)%>" resultType="<%=NameSpace%>.entity.<%=buildClassName(serviceCode, mapping)%>">
+        {call <%=serviceCode%>(<%
+            if (!string.IsNullOrEmpty(mapping)) {
+                %>'<%=mapping%>',<%
+            }
+            DataRow[] inputRows = natureTable.Select("arg_type=1");
+            for (int x=0;x<inputRows.Length;x++) {
+                String natureCode = inputRows[x]["nature_code"].ToString();
+                %>#{<%=natureCode%>}<%
+                if (x<inputRows.Length-1) {
+                    %>,<%
+                }
+            }
+                %>
+        )}
+        </select>
+                <%
+                break;
+            default:%>
+        <select id="<%=buildMethodName(serviceCode, mapping)%>" resultType="<%=NameSpace%>.entity.<%=buildClassName(serviceCode, mapping)%>">
+        {call <%=serviceCode%>(<%
+            if (!string.IsNullOrEmpty(mapping)) {
+                %>'<%=mapping%>',<%
+            }
+            DataRow[] rows = natureTable.Select("arg_type=1");
+            for (int x=0;x<rows.Length;x++) {
+                String natureCode = rows[x]["nature_code"].ToString();
+                %>#{<%=natureCode%>}<%
+                if (x<rows.Length-1) {
+                    %>,<%
+                }
+            }
+                %>
+        )}
+        </select>
+                <% break;
+        }
+    }%>
+</mapper>

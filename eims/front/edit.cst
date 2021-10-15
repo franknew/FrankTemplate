@@ -1,0 +1,178 @@
+﻿<%@ Template Language="C#" TargetLanguage="Java" Encoding="UTF-8" ResponseEncoding="UTF-8"%>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer"%>
+<%@ Import Namespace="System.Text" %>
+<%@ Property Name="NatureTable" Type="DataTable" Optional="True"%>
+<%@ Property Name="ServiceCode" Type="System.String" %>
+<%@ Property Name="ServiceName" Type="System.String" %>
+<%@ Property Name="ActionMapping" Type="System.String" %>
+<%@ Property Name="MenuCode" Type="System.String" %>
+
+<script runat="template">
+// My methods here.
+public String ConvertTableCamel(String tableName) {
+    if (tableName.StartsWith("t_")) {
+        tableName = tableName.TrimStart('t','_').TrimEnd('_');
+    }
+    if (tableName.StartsWith("p_")) {
+        tableName = tableName.TrimStart('p','_').TrimEnd('_');
+    }
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = true;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+public String ConvertColumnCamel(String tableName) {
+    if (tableName.StartsWith("t_")) {
+        tableName = tableName.TrimStart('t','_').TrimEnd('_');
+    }
+    if (tableName.StartsWith("p_")) {
+        tableName = tableName.TrimStart('p','_').TrimEnd('_');
+    }
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = false;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            builder.Append(ch.ToString());
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+
+public string ConvertColumnType(DbType type) {
+    string typeName = "String";
+    switch (type) {
+        case DbType.Int16:
+        case DbType.Int32:
+        case DbType.Int64:
+        case DbType.Boolean:
+        case DbType.UInt16:
+        case DbType.UInt32:
+        case DbType.UInt64:
+        case DbType.SByte:
+            typeName = "Integer";
+            break;
+        case DbType.String:
+            typeName = "String";
+            break;
+        case DbType.DateTime:
+        case DbType.Date:
+            typeName = "Date";
+            break;
+        case DbType.Decimal:
+            typeName = "BigDecimal";
+            break;
+    }
+    return typeName;
+}
+
+public string buildClassName(string name, string ext) {
+    return ConvertTableCamel(name) + ext;
+}
+
+public string buildMethodName(string name, string ext) {
+    return ConvertColumnCamel(name) + ext;
+}
+</script>
+<%
+    DataRow[] displayRows = NatureTable.Select("arg_type=1");
+    DataRow[] dataDicRows = NatureTable.Select("data_dic_code is not null and data_dic_code<>''");
+
+%>
+<template>
+<el-dialog title="<%=ServiceName%>" :visible.sync="dialogFormVisible" :modal-append-to-body='false'>
+  <el-form :model="model">
+  <% foreach (DataRow displayRow in displayRows) {%>
+    <el-form-item label="<%=displayRow["nature_name"].ToString()%>">
+    <% if (!string.IsNullOrEmpty(displayRow["data_dic_code"].ToString())) {%>
+        <el-select filterable clearable  v-model="model.<%=displayRow["nature_code"].ToString()%>">
+            <el-option v-for="(item,index) in <%=displayRow["data_dic_code"].ToString()%>" :key="index" :label="item.name" :value="item.value" />
+        </el-select>
+    <%}
+    else if (displayRow["nature_code"].ToString().EndsWith("date")) {%>
+        <el-date-picker v-model="model.<%=displayRow["nature_code"].ToString()%>" type="date" />
+    <%}
+    else {%>
+        <el-input v-model="model.<%=displayRow["nature_code"].ToString()%>" autocomplete="off" />
+    <%}%>
+    </el-form-item>
+  <%}%>
+  </el-form>
+  <div slot="footer" class="dialog-footer">
+    <el-button type="primary" @click="save">保 存</el-button>
+    <el-button @click="close">取 消</el-button>
+  </div>
+</el-dialog>
+</template>
+
+<script>
+import api from "@/api/<%=MenuCode%>.js"
+export default {
+    name: "<%=ServiceCode%>_edit",
+    props: {
+        model: Object,
+        <%foreach (DataRow row in dataDicRows) {%>
+        <%=row["data_dic_code"].ToString() %>: Array,
+        <%} %>
+    },
+    data() {
+        return {
+            model: {
+  <% foreach (DataRow displayRow in displayRows) {%>
+                <%=displayRow["nature_code"].ToString() %>: "",
+  <%}%>
+            },
+            dialogFormVisible: false,
+        }
+    },
+    methods: {
+        close() {
+            this.dialogFormVisible = false;
+        },
+        show(data) {
+            this.model = data;
+            this.dialogFormVisible = true;
+        },
+        save(row) {
+            this.model = row;
+            api.<%=buildMethodName(ServiceCode, ActionMapping) %>(row).then(t=> {
+                if (t != 200) {
+                    return;
+                }
+                this.$message('保存成功！');
+            });
+        },
+    }
+}
+
+</script>

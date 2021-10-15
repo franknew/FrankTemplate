@@ -1,0 +1,142 @@
+﻿<%@ Template Language="C#" TargetLanguage="Java" Encoding="UTF-8" ResponseEncoding="UTF-8"%>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer"%>
+<%@ Import Namespace="System.Text" %>
+<%@ Property Name="ServiceTable" Type="DataTable" Optional="True"%>
+<%@ Property Name="NameSpace" Type="System.String" Default="com.xcd.eims" %>
+
+<script runat="template">
+// My methods here.
+public String ConvertTableCamel(String tableName) {
+    if (tableName.StartsWith("t_")) {
+        tableName = tableName.TrimStart('t','_').TrimEnd('_');
+    }
+    if (tableName.StartsWith("p_")) {
+        tableName = tableName.TrimStart('p','_').TrimEnd('_');
+    }
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = true;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+public String ConvertColumnCamel(String tableName) {
+    if (tableName.StartsWith("t_")) {
+        tableName = tableName.TrimStart('t','_').TrimEnd('_');
+    }
+    if (tableName.StartsWith("p_")) {
+        tableName = tableName.TrimStart('p','_').TrimEnd('_');
+    }
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = false;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            builder.Append(ch.ToString());
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+
+public string ConvertColumnType(DbType type) {
+    string typeName = "String";
+    switch (type) {
+        case DbType.Int16:
+        case DbType.Int32:
+        case DbType.Int64:
+        case DbType.Boolean:
+        case DbType.UInt16:
+        case DbType.UInt32:
+        case DbType.UInt64:
+        case DbType.SByte:
+            typeName = "Integer";
+            break;
+        case DbType.String:
+            typeName = "String";
+            break;
+        case DbType.DateTime:
+        case DbType.Date:
+            typeName = "Date";
+            break;
+        case DbType.Decimal:
+            typeName = "BigDecimal";
+            break;
+    }
+    return typeName;
+}
+
+public string buildClassName(string name, string ext) {
+    return ConvertTableCamel(name) + ext;
+}
+
+public string buildMethodName(string name, string ext) {
+    return ConvertColumnCamel(name) + ext;
+}
+</script>
+package <%=NameSpace%>.service;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import <%=NameSpace%>.entity.*;
+import <%=NameSpace%>.request.*;
+import <%=NameSpace%>.mapper.*;
+import java.util.List;
+
+@Service
+public class <%= ConvertTableCamel(ServiceTable.TableName)%>Service {
+    @Autowired
+    <%= ConvertTableCamel(ServiceTable.TableName)%>Mapper mapper;
+    
+    <%
+    foreach (DataRow row in ServiceTable.Rows) {
+        int? type = row["type"] as int?;
+        string serviceCode = row["service_code"].ToString();
+        string serviceName = row["service_name"].ToString();
+        string mapping = row["action_mapping"].ToString();
+        switch (type) {
+            case 0:%>
+    /**
+    ** <%=row["service_name"].ToString() %>
+    **/
+    public List<%="<" + buildClassName(row["service_code"].ToString(), row["action_mapping"].ToString()) + ">" %> <%=buildMethodName(row["service_code"].ToString(), row["action_mapping"].ToString()) %>(<%=buildClassName(row["service_code"].ToString(), row["action_mapping"].ToString()) %>Request request) {
+        return mapper.<%= buildMethodName(row["service_code"].ToString(), row["action_mapping"].ToString())%>(request);
+    }<%
+                break;
+            default:%>
+    /**
+    ** <%=row["service_name"].ToString() %>
+    **/
+    public <%=buildClassName(row["service_code"].ToString(), row["action_mapping"].ToString())%> <%=buildMethodName(row["service_code"].ToString(), row["action_mapping"].ToString()) %>(<%=buildClassName(row["service_code"].ToString(), row["action_mapping"].ToString()) %>Request request) {
+        return mapper.<%= buildMethodName(row["service_code"].ToString(), row["action_mapping"].ToString())%>(request);
+    }<%
+                break;
+        }
+    }%>
+}

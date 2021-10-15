@@ -10,7 +10,6 @@
 <%@ Register Name="entity" Template="entity.cst" %>
 <%@ Register Name="mapper" Template="mapper.cst" %>
 <%@ Register Name="xml" Template="xml.cst" %>
-<%@ Register Name="service" Template="basicservice.cst" %>
 <%@ Register Name="query" Template="query-response.cst" %>
 
 <script runat="template">

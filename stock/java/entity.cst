@@ -1,4 +1,4 @@
-﻿<%@ Template Language="C#" TargetLanguage="Text" Encoding="UTF-8" ResponseEncoding="UTF-8"%>
+﻿<%@ Template Language="c#" TargetLanguage="Text" Encoding="UTF-8" ResponseEncoding="UTF-8"%>
 <%@ Import Namespace="System.Text" %>
 <%@ Import Namespace="System.Collections.Generic" %>
 <%@ Property Name="TableName" Type="String" Optional="True"%>
