@@ -196,7 +196,7 @@ export default {
             return this.model.stat == 0;
         },
         audit(status) {
-            api.<%=buildMethodName(ServiceCode, ActionMapping)%>(...this.model, stat: status).then(t=> {
+            api.<%=buildMethodName(ServiceCode, ActionMapping)%>({...this.model, stat: status}).then(t=> {
                 if (t.code != 200) {
                     return;
                 }

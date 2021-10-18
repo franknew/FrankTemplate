@@ -105,7 +105,8 @@ public string buildMethodName(string name, string ext) {
 }
 </script>
 <%
-    DataRow[] displayRows = NatureTable.Select("arg_type=1");
+    DataRow[] displayRows = NatureTable.Select("arg_type=1 and display=1");
+    DataRow[] allRows = NatureTable.Select("arg_type=1");
     DataRow[] dataDicRows = NatureTable.Select("data_dic_code is not null and data_dic_code<>''");
 
 %>
@@ -148,7 +149,7 @@ export default {
     data() {
         return {
             model: {
-  <% foreach (DataRow displayRow in displayRows) {%>
+  <% foreach (DataRow displayRow in allRows) {%>
                 <%=displayRow["nature_code"].ToString() %>: "",
   <%}%>
             },
@@ -164,9 +165,8 @@ export default {
             this.dialogFormVisible = true;
         },
         save(row) {
-            this.model = row;
-            api.<%=buildMethodName(ServiceCode, ActionMapping) %>(row).then(t=> {
-                if (t != 200) {
+            api.<%=buildMethodName(ServiceCode, ActionMapping) %>(this.model).then(t=> {
+                if (t.code != 200) {
                     return;
                 }
                 this.$message('保存成功！');

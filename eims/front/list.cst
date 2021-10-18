@@ -138,9 +138,11 @@ public string buildMethodName(string name, string ext) {
       :columns="columns"
       :data="tableData"
       :pager="page"
+      ButtonTitle="新增"
       :paginationBoxReflow="paginationBoxReflow"
       @handleSizeChange="handleSizeChange"
       @handleCurrentChange="handleCurrentChange"
+      @handleAdd="doAdd"
     >
         <el-table-column
         slot="table_oper"
@@ -170,6 +172,8 @@ public string buildMethodName(string name, string ext) {
       </el-table-column>
     </commonTable>
     
+    <%if (addRows != null && addRows.Length > 0) {
+    %><%="<" + buildClassName(addRows[0]["service_code"].ToString(),addRows[0]["action_mapping"].ToString())%> ref="<%=buildMethodName(addRows[0]["service_code"].ToString(),addRows[0]["action_mapping"].ToString())%>Ref"/><%} %>
     <%if (viewRows != null && viewRows.Length > 0) {
     %><%="<" + buildClassName(viewRows[0]["service_code"].ToString(),viewRows[0]["action_mapping"].ToString())%> ref="<%=buildMethodName(viewRows[0]["service_code"].ToString(),viewRows[0]["action_mapping"].ToString())%>Ref"/><%} %>
     <%if (editRows != null && editRows.Length > 0) {
@@ -194,6 +198,9 @@ import dataDicApi from "@/api/datadic.js"
 <%if (viewRows != null && viewRows.Length > 0) {
 %>import <%=buildClassName(viewRows[0]["service_code"].ToString(),viewRows[0]["action_mapping"].ToString())%> from '@<%=buildClassName(viewRows[0]["service_code"].ToString(),viewRows[0]["action_mapping"].ToString())%>.vue'<%
 } %>
+<%if (addRows != null && addRows.Length > 0) {
+%>import <%=buildClassName(addRows[0]["service_code"].ToString(),addRows[0]["action_mapping"].ToString())%> from '@<%=buildClassName(addRows[0]["service_code"].ToString(),addRows[0]["action_mapping"].ToString())%>.vue'<%
+} %>
 <%if (editRows != null && editRows.Length > 0) {
 %>import <%=buildClassName(editRows[0]["service_code"].ToString(),editRows[0]["action_mapping"].ToString())%> from '@<%=buildClassName(editRows[0]["service_code"].ToString(),editRows[0]["action_mapping"].ToString())%>.vue'<%
 } %>
@@ -207,6 +214,9 @@ export default {
         commonSearch,
         <%if (viewRows != null && viewRows.Length > 0) {
         %><%=buildClassName(viewRows[0]["service_code"].ToString(),viewRows[0]["action_mapping"].ToString())%>,<%
+        } %>
+        <%if (addRows != null && addRows.Length > 0) {
+        %><%=buildClassName(addRows[0]["service_code"].ToString(),addRows[0]["action_mapping"].ToString())%>,<%
         } %>
         <%if (editRows != null && editRows.Length > 0) {
         %><%=buildClassName(editRows[0]["service_code"].ToString(),editRows[0]["action_mapping"].ToString())%>,<%
@@ -404,8 +414,8 @@ export default {
             <%}%>
         },
         doAdd() {
-            <%if (editRows != null && editRows.Length > 0) {%>
-            this.$refs.<%=buildMethodName(editRows[0]["service_code"].ToString(),editRows[0]["action_mapping"].ToString())%>Ref.show(this.newModel);
+            <%if (addRows != null && addRows.Length > 0) {%>
+            this.$refs.<%=buildMethodName(addRows[0]["service_code"].ToString(),addRows[0]["action_mapping"].ToString())%>Ref.show(this.newModel);
             <%} %>
         },
         list() {

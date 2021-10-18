@@ -286,6 +286,7 @@ public void RenderFrontTemplate(DataTable serviceTable, string path, string serv
         case 0:
             break;
         case 1:
+            RenderEdit(serviceTable, path, serviceCode, mapping, serviceName, menuCode);
             break;
         case 2:
             RenderEdit(serviceTable, path, serviceCode, mapping, serviceName, menuCode);
