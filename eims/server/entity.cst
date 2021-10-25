@@ -46,6 +46,9 @@ public String ConvertColumnCamel(String tableName) {
     if (tableName.StartsWith("p_")) {
         tableName = tableName.TrimStart('p','_').TrimEnd('_');
     }
+    if (tableName.Equals("long")) {
+        return "Long";
+    }
     StringBuilder builder = new StringBuilder();
     bool needUpper = false;
     int i = 0;

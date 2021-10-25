@@ -7,6 +7,7 @@
 <%@ Property Name="ServiceName" Type="System.String" %>
 <%@ Property Name="ActionMapping" Type="System.String" %>
 <%@ Property Name="MenuCode" Type="System.String" %>
+<%@ Property Name="MenuId" Type="Int32" %>
 
 <script runat="template">
 // My methods here.
@@ -112,36 +113,34 @@ public string buildMethodName(string name, string ext) {
 %>
 <template>
 <el-dialog title="<%=ServiceName%>" :visible.sync="dialogFormVisible" :modal-append-to-body='false'>
-  <el-form :model="model">
-  <% foreach (DataRow displayRow in displayRows) {%>
-    <el-form-item label="<%=displayRow["nature_name"].ToString()%>">
-    <% if (!string.IsNullOrEmpty(displayRow["data_dic_code"].ToString())) {%>
-        <el-select filterable clearable  v-model="model.<%=displayRow["nature_code"].ToString()%>">
-            <el-option v-for="(item,index) in <%=displayRow["data_dic_code"].ToString()%>" :key="index" :label="item.name" :value="item.value" />
-        </el-select>
-    <%}
-    else if (displayRow["nature_code"].ToString().EndsWith("date")) {%>
-        <el-date-picker v-model="model.<%=displayRow["nature_code"].ToString()%>" type="date" />
-    <%}
-    else {%>
-        <el-input v-model="model.<%=displayRow["nature_code"].ToString()%>" autocomplete="off" />
-    <%}%>
-    </el-form-item>
-  <%}%>
-  </el-form>
-  <div slot="footer" class="dialog-footer">
-    <el-button type="primary" @click="save">保 存</el-button>
-    <el-button @click="close">取 消</el-button>
-  </div>
+  <comForm
+      v-if='dialogFormVisible'
+      ref="formRef"
+      :data="modelCopy"
+      :field-list="fieldList"
+      :list-type-info="listTypeInfo"
+      :catalogProductFlag="false"
+      :exportBtnFlag="false"
+      :remote="true"
+      class="creditRecordSearchBar"
+    >
+        <el-button type="primary" @click="save">保存</el-button>
+        <el-button @click="close">关闭</el-button>
+    </comForm>
 </el-dialog>
 </template>
 
 <script>
 import api from "@/api/<%=MenuCode%>.js"
+import service from "@/api/pc_service.js"
+import dataDicApi from "@/api/datadic.js"
+import comForm from '@/components/comForm/comForm'
 export default {
     name: "<%=ServiceCode%>_edit",
+    components: {
+        comForm
+    },
     props: {
-        model: Object,
         <%foreach (DataRow row in dataDicRows) {%>
         <%=row["data_dic_code"].ToString() %>: Array,
         <%} %>
@@ -149,28 +148,57 @@ export default {
     data() {
         return {
             model: {
-  <% foreach (DataRow displayRow in allRows) {%>
-                <%=displayRow["nature_code"].ToString() %>: "",
-  <%}%>
+            },
+            modelCopy: {
+            },
+            fieldList: [
+            ],
+            listTypeInfo: [
+            ],
+            fullServiceInfo: {
             },
             dialogFormVisible: false,
+            count: 2,
+            width: {
+              labelWidth: 110,
+              itemWidth: 220
+            },
         }
+    },
+    mounted() {
+        this.init();
     },
     methods: {
         close() {
             this.dialogFormVisible = false;
         },
         show(data) {
+            this.modelCopy = JSON.parse(JSON.stringify(data));
             this.model = data;
             this.dialogFormVisible = true;
         },
-        save(row) {
-            api.<%=buildMethodName(ServiceCode, ActionMapping) %>(this.model).then(t=> {
+        save() {
+            this.modelCopy = this.$refs.formRef.defaultData;
+            api.<%=buildMethodName(ServiceCode, ActionMapping) %>(this.modelCopy).then(t=> {
                 if (t.code != 200) {
                     return;
                 }
+                this.model = JSON.parse(JSON.stringify(this.modelCopy));
                 this.$message('保存成功！');
+                this.$emit("onRefresh");
+                this.close();
             });
+        },
+        init() {
+            service.getFullServiceInfo({serviceCode: '<%=ServiceCode%>', actionMapping: '<%=ActionMapping%>', menuId: <%=MenuId%>}).then(t=> {
+                if (t.code != 200) {
+                    return;
+                }
+                this.fullServiceInfo = t.data;
+                this.fieldList = service.genQueryModel(this.fullServiceInfo);
+                this.model = service.getModel(this.fullServiceInfo.displayInputNatures);
+            });
+            this.listTypeInfo = dataDicApi.getAll();
         },
     }
 }

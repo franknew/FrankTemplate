@@ -2,11 +2,7 @@
 <%@ Assembly Name="SchemaExplorer" %>
 <%@ Import Namespace="SchemaExplorer"%>
 <%@ Import Namespace="System.Text" %>
-<%@ Property Name="NatureTable" Type="DataTable" Optional="True"%>
-<%@ Property Name="ServiceCode" Type="System.String" Optional="True"%>
-<%@ Property Name="ServiceName" Type="System.String" %>
-<%@ Property Name="ActionMapping" Type="System.String" %>
-<%@ Property Name="MenuId" Type="Int32" %>
+<%@ Property Name="MenuTable" Type="DataTable" Optional="True"%>
 
 <script runat="template">
 // My methods here.
@@ -104,74 +100,116 @@ public string buildMethodName(string name, string ext) {
     return ConvertColumnCamel(name) + ext;
 }
 </script>
-<%
-    DataRow[] displayRows = NatureTable.Select("arg_type=2 and display=1");
+import Vue from 'vue'
+import Router from 'vue-router'
 
-%>
-<template>
-<el-dialog title="<%=ServiceName%>" :visible.sync="dialogFormVisible" :modal-append-to-body='false' distroy-on-close='true'>
-  <comForm
-      v-if='dialogFormVisible'
-      ref="formRef"
-      :data="model"
-      :field-list="fieldList"
-      :list-type-info="listTypeInfo"
-      :catalogProductFlag="false"
-      :exportBtnFlag="false"
-      :remote="true"
-      class="creditRecordSearchBar"
-    >
-        <el-button @click="close">关闭</el-button>
-    </comForm>
-</el-dialog>
-</template>
+Vue.use(Router)
 
-<script>
-import service from "@/api/pc_service.js"
-import comForm from '@/components/comForm/comForm'
+/* Layout */
+import Layout from '@/layout'
 
-export default {
-    name: "<%=ServiceCode%>_view",
-    components: {
-        comForm
-    },
-    data() {
-        return {
-            model: {
-            },
-            fieldList: [
-            ],
-            listTypeInfo: {
-            },
-            dialogFormVisible: false,
-        }
-    },
-    mounted() {
-        this.init();
-    },
-    methods: {
-        close() {
-            this.dialogFormVisible = false;
-        },
-        show(data) {
-            this.model = data;
-            this.dialogFormVisible = true;
-        },
-        init() {
-            service.getFullServiceInfo({serviceCode: '<%=ServiceCode%>', actionMapping: '<%=ActionMapping%>', menuId: <%=MenuId%>}).then(t=> {
-                if (t.code != 200) {
-                    return;
-                }
-                this.fullServiceInfo = t.data;
-                let temp = service.genFormModels(this.fullServiceInfo.displayOutputNatures);
-                this.model = service.getModel(this.fullServiceInfo.displayOutputNatures);
-                for (var i = 0; i < temp.length; i++) {
-                    temp[i].disabled = true;
-                }
-                this.fieldList = temp;
-            });
-        },
-    }
+export const routesMap = {
+  // 固定路由
+  redirect: () => import('@/views/redirect/index'),
+  Layout: () => import('@/layout'),
+  login: () => import('@/views/login/index'),
+  authRedirect: () => import('@/views/login/auth-redirect'),
+  workBench: () => import('@/views/workBench/workBench'),
+  404: () => import('@/views/error-page/404'),
+  401: () => import('@/views/error-page/401'),
+  <%foreach (DataRow row in MenuTable.Rows) {%>
+  <%    string menuCode = row["menu_code"].ToString();
+        string menuName = row["menu_name"].ToString();
+      %>
+  <%=menuCode %>: ()=> import('@/views/list/<%=menuCode %>'),
+  <%}%>
+}
+/**
+ * constantRoutes
+ * a base page that does not have permission requirements
+ * all roles can be accessed
+ */
+export const constantRoutes = [
+    {
+    path: '/redirect',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: '/redirect/:path(.*)',
+        component: routesMap['redirect']
+      }
+    ]
+  },
+  {
+    path: '/login',
+    component: routesMap['login'],
+    hidden: true
+  },
+  {
+    path: '/auth-redirect',
+    component: routesMap['authRedirect'],
+    hidden: true
+  },
+  {
+    path: '/404',
+    component: routesMap['404'],
+    hidden: true
+  },
+  {
+    path: '/401',
+    component: routesMap['401'],
+    hidden: true
+  },
+  {
+    path: '/',
+    component: Layout,
+    redirect: '/workBench',
+    children: [
+      {
+        path: 'workBench',
+        component: routesMap['workBench'],
+        canClick: true,
+        name: 'workBench',
+        meta: { title: '工作台', icon: 'documentation', affix: true }
+      }
+    ]
+  },
+  {
+    path: '/baseData',
+    component: Layout,
+    redirect: '/baseData/clientManage',
+    meta: { title: '基础数据', icon: 'documentation' },
+    popper: true,
+    children: [
+    <% foreach (DataRow row in MenuTable.Rows) {
+        string menuCode = row["menu_code"].ToString();
+        string menuName = row["menu_name"].ToString();
+    %>
+      {
+        path: '/baseData/<%=menuCode%>',
+        component: routesMap['<%=menuCode%>'],
+        name: '<%=menuCode%>',
+        meta: { title: '<%=menuName%>', activeMenu: '/baseData' }
+      },
+    <%}%>
+  }
+]
+
+export const asyncRoutes = []
+
+const createRouter = () => new Router({
+  mode: 'history', // require service support
+  scrollBehavior: () => ({ y: 0 }),
+  routes: constantRoutes
+})
+
+const router = createRouter()
+
+// Detail see: https://github.com/vuejs/vue-router/issues/1234#issuecomment-357941465
+export function resetRouter() {
+  const newRouter = createRouter()
+  router.matcher = newRouter.matcher // reset router
 }
 
-</script>
+export default router

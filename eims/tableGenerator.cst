@@ -23,6 +23,9 @@
 <%@ Register Name="edit" Template="front/edit.cst" %>
 <%@ Register Name="audit" Template="front/audit.cst" %>
 <%@ Register Name="api" Template="front/api.cst" %>
+<%@ Register Name="popup" Template="front/popup.cst" %>
+<%@ Register Name="his" Template="front/his.cst" %>
+<%@ Register Name="menu" Template="front/menu.cst" %>
 
 <script runat="template">
 
@@ -169,14 +172,23 @@ public DataTable run() {
                 natureTableTemp.ImportRow(dr);
             }
             servicerow["natures"] = natureTableTemp;
+        }
+        foreach (DataRow servicerow in serviceTableTemp.Rows) {
+            int? serviceId = servicerow["id"] as int?;
+            string serviceCode = servicerow["service_code"].ToString();
+            string serviceName = servicerow["service_name"].ToString();
+            string mapping = servicerow["action_mapping"].ToString();
+            int? type = servicerow["type"] as int?;
+            DataTable natureTableTemp = servicerow["natures"] as DataTable;
             RenderEntity(natureTableTemp, path, serviceCode, mapping);
             RenderRequest(natureTableTemp, path, serviceCode, mapping);
-            RenderFrontTemplate(natureTableTemp, path, serviceCode, mapping, serviceName, type, menuCode);
+            RenderFrontTemplate(serviceTableTemp, natureTableTemp, path, serviceCode, mapping, serviceName, type, menuCode, menuId.Value);
         }
-        RenderAll(serviceTableTemp, natureTable, path, menuCode);
+        RenderAll(serviceTableTemp, natureTable, path, menuCode, menuId.Value);
         
         menurow["services"] = serviceTable;
     }
+    RenderMenu(menuTable, Output);
     return menuTable;
 }
 
@@ -185,12 +197,12 @@ public void RenderTemplate(CodeTemplate template, string path) {
     RenderToFile(template, path);
 }
 
-public void RenderAll(DataTable serviceTable, DataTable natureTable, string path, string serviceCode) {
+public void RenderAll(DataTable serviceTable, DataTable natureTable, string path, string serviceCode, int menuId) {
     RenderXml(serviceTable, path, serviceCode);
     RenderMapper(serviceTable, path, serviceCode);
     RenderService(serviceTable, path, serviceCode);
     RenderController(serviceTable, path, serviceCode);
-    RenderList(serviceTable, natureTable, path, serviceCode);
+    RenderList(serviceTable, natureTable, path, serviceCode, menuId);
     RenderApi(serviceTable, path, serviceCode);
 }
 
@@ -198,6 +210,13 @@ public void RenderXml(DataTable serviceTable, string path, string serviceCode) {
     path += "server\\\\xml\\\\" + serviceCode + ".xml";
     CodeTemplate xml = new xml();
     xml.SetProperty("ServiceTable", serviceTable);
+    RenderTemplate(xml, path);
+}
+
+public void RenderMenu(DataTable menuTable, string path) {
+    path += "front\\\\menu.vue";
+    CodeTemplate xml = new menu();
+    xml.SetProperty("MenuTable", menuTable);
     RenderTemplate(xml, path);
 }
 
@@ -233,25 +252,39 @@ public void RenderService(DataTable serviceTable, string path, string serviceCod
     RenderTemplate(template, path);
 }
 public void RenderController(DataTable serviceTable, string path, string serviceCode) {
-    path += "server\\\\contrller\\\\" + serviceCode + "Controller.java";
+    path += "server\\\\controller\\\\" + serviceCode + "Controller.java";
     CodeTemplate template = new controller();
     template.SetProperty("ServiceTable", serviceTable);
     RenderTemplate(template, path);
 }
 
-public void RenderList(DataTable serviceTable, DataTable natureTable, string path, string serviceCode) {
+public void RenderList(DataTable serviceTable, DataTable natureTable, string path, string serviceCode, int menuId) {
     path += "front\\\\list\\\\" + serviceCode + ".vue";
     CodeTemplate template = new list();
     template.SetProperty("ServiceTable", serviceTable);
     template.SetProperty("NatureTable", natureTable);
+    template.SetProperty("MenuId", menuId);
     RenderTemplate(template, path);
 }
-public void RenderView(DataTable natureTable, string path, string serviceCode, string mapping, string serviceName) {
+public void RenderView(DataTable natureTable, string path, string serviceCode, string mapping, string serviceName, int menuId) {
     path += "front\\\\view\\\\" + buildClassName(serviceCode, mapping) + ".vue";
     CodeTemplate template = new view();
     template.SetProperty("NatureTable", natureTable);
     template.SetProperty("ServiceName", serviceName);
     template.SetProperty("ServiceCode", serviceCode);
+    template.SetProperty("ActionMapping", mapping);
+    template.SetProperty("MenuId", menuId);
+    RenderTemplate(template, path);
+}
+public void RenderHistory(DataTable natureTable, string path, string serviceCode, string mapping, string serviceName, string menuCode, int menuId) {
+    path += "front\\\\his\\\\" + buildClassName(serviceCode, mapping) + ".vue";
+    CodeTemplate template = new his();
+    template.SetProperty("NatureTable", natureTable);
+    template.SetProperty("ServiceName", serviceName);
+    template.SetProperty("ServiceCode", serviceCode);
+    template.SetProperty("ActionMapping", mapping);
+    template.SetProperty("MenuCode", menuCode);
+    template.SetProperty("MenuId", menuId);
     RenderTemplate(template, path);
 }
 public void RenderApi(DataTable serviceTable, string path, string serviceCode) {
@@ -260,7 +293,7 @@ public void RenderApi(DataTable serviceTable, string path, string serviceCode) {
     template.SetProperty("ServiceTable", serviceTable);
     RenderTemplate(template, path);
 }
-public void RenderEdit(DataTable natureTable, string path, string serviceCode, string mapping, string serviceName, string menuCode) {
+public void RenderEdit(DataTable natureTable, string path, string serviceCode, string mapping, string serviceName, string menuCode, int menuId) {
     path += "front\\\\edit\\\\" + buildClassName(serviceCode, mapping) + ".vue";
     CodeTemplate template = new edit();
     template.SetProperty("NatureTable", natureTable);
@@ -268,11 +301,13 @@ public void RenderEdit(DataTable natureTable, string path, string serviceCode, s
     template.SetProperty("ServiceCode", serviceCode);
     template.SetProperty("MenuCode", menuCode);
     template.SetProperty("ActionMapping", mapping);
+    template.SetProperty("MenuId", menuId);
     RenderTemplate(template, path);
 }
-public void RenderAudit(DataTable natureTable, string path, string serviceCode, string mapping, string serviceName, string menuCode) {
-    path += "front\\\\audit\\\\" + buildClassName(serviceCode, mapping) + ".vue";
-    CodeTemplate template = new audit();
+
+public void RenderListPopup(DataTable natureTable, string path, string serviceCode, string mapping, string serviceName, string menuCode) {
+    path += "front\\\\popup\\\\" + buildClassName(serviceCode, mapping) + ".vue";
+    CodeTemplate template = new popup();
     template.SetProperty("NatureTable", natureTable);
     template.SetProperty("ServiceName", serviceName);
     template.SetProperty("ServiceCode", serviceCode);
@@ -280,24 +315,51 @@ public void RenderAudit(DataTable natureTable, string path, string serviceCode, 
     template.SetProperty("ActionMapping", mapping);
     RenderTemplate(template, path);
 }
+public void RenderAudit(DataTable serviceTable, DataTable natureTable, string path, string serviceCode, string mapping, string serviceName, string menuCode, int menuId) {
+    DataRow[] editRows = null;
+    editRows = serviceTable.Select("type=2");
+    if (editRows.Length == 0) {
+    editRows = serviceTable.Select("type=1");
+    }
+    if (editRows.Length == 0) {
+        return;
+    }
+    DataTable editNatureTable = editRows[0]["natures"] as DataTable;
+    string editMapping = editRows[0]["action_mapping"].ToString();
+    string editServiceCode = editRows[0]["service_code"].ToString();
+    path += "front\\\\audit\\\\" + menuCode + ".vue";
+    CodeTemplate template = new audit();
+    template.SetProperty("ServiceName", serviceName);
+    template.SetProperty("ServiceCode", serviceCode);
+    template.SetProperty("MenuCode", menuCode);
+    template.SetProperty("ActionMapping", mapping);
+    template.SetProperty("EditActionMapping", editMapping);
+    template.SetProperty("EditServiceCode", editServiceCode);
+    template.SetProperty("MenuId", menuId);
+    RenderTemplate(template, path);
+}
 
-public void RenderFrontTemplate(DataTable serviceTable, string path, string serviceCode, string mapping, string serviceName, int? type, string menuCode) {
+public void RenderFrontTemplate(DataTable serviceTable, DataTable natureTable, string path, string serviceCode, string mapping, string serviceName, int? type, string menuCode, int menuId) {
     switch(type) {
         case 0:
+            RenderListPopup(natureTable, path, serviceCode, mapping, serviceName, menuCode);
             break;
         case 1:
-            RenderEdit(serviceTable, path, serviceCode, mapping, serviceName, menuCode);
+            RenderEdit(natureTable, path, serviceCode, mapping, serviceName, menuCode, menuId);
             break;
         case 2:
-            RenderEdit(serviceTable, path, serviceCode, mapping, serviceName, menuCode);
+            RenderEdit(natureTable, path, serviceCode, mapping, serviceName, menuCode, menuId);
             break;
         case 3:
-            RenderView(serviceTable, path, serviceCode, mapping, serviceName);
+            RenderView(natureTable, path, serviceCode, mapping, serviceName, menuId);
             break;
         case 4:
-            RenderAudit(serviceTable, path, serviceCode, mapping, serviceName, menuCode);
+            RenderAudit(serviceTable, natureTable, path, serviceCode, mapping, serviceName, menuCode, menuId);
             break;
         case 5:
+            break;
+        case 6:
+            RenderHistory(natureTable, path, serviceCode, mapping, serviceName, menuCode, menuId);
             break;
     }
 }

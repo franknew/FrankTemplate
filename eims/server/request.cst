@@ -46,6 +46,9 @@ public String ConvertColumnCamel(String tableName) {
     if (tableName.StartsWith("p_")) {
         tableName = tableName.TrimStart('p','_').TrimEnd('_');
     }
+    if (tableName.Equals("long")) {
+        return "Long";
+    }
     StringBuilder builder = new StringBuilder();
     bool needUpper = false;
     int i = 0;
@@ -105,20 +108,33 @@ public string buildMethodName(string name, string ext) {
 </script>
 package <%=NameSpace%>.reqeust;
 import io.swagger.annotations.ApiModelProperty;
+import java.math.BigDecimal;
 
 import lombok.Data;
 
 @Data
-public class <%= buildClassName(ServiceCode,Mapping)%>Request {
+public class <%= buildClassName(ServiceCode,Mapping).Trim()%>Request {
     <% 
     DataRow[] natureRows = NatureTable.Select("arg_type=1");
     foreach (DataRow row in natureRows) {
+        int? fieldType = row["field_type"] as int?;
         String natureName = row["nature_name"].ToString();
         String natureCode = row["nature_code"]?.ToString();%>  
     /**
     ** <%=natureName %>
     **/
-    @ApiModelProperty(value = "<%=natureName %>")
-    String <%=ConvertColumnCamel(natureCode) %>;
+    @ApiModelProperty(value = "<%=natureName.Trim() %>")
+        <%switch (fieldType) {
+            case 100:
+            case 3:%>
+    Integer <%=ConvertColumnCamel(natureCode) %> = 0;
+                <%break;
+            case 101:%>
+    BigDecimal <%=ConvertColumnCamel(natureCode) %> = new BigDecimal("0");
+                <%break;
+            default:%>
+    String <%=ConvertColumnCamel(natureCode) %> = "";
+                <%break;
+        }%>
     <%}%>
 }

@@ -2,11 +2,12 @@
 <%@ Assembly Name="SchemaExplorer" %>
 <%@ Import Namespace="SchemaExplorer"%>
 <%@ Import Namespace="System.Text" %>
+<%@ Import Namespace="System.Collections.Generic" %>
 <%@ Property Name="NatureTable" Type="DataTable" Optional="True"%>
-<%@ Property Name="ServiceCode" Type="System.String" Optional="True"%>
-<%@ Property Name="ServiceName" Type="System.String" %>
-<%@ Property Name="ActionMapping" Type="System.String" %>
-<%@ Property Name="MenuId" Type="Int32" %>
+<%@ Property Name="ServiceName" Type="System.String" Optional="True"%>
+<%@ Property Name="ActionMapping" Type="System.String" Optional="True"%>
+<%@ Property Name="MenuCode" Type="System.String" Optional="True"%>
+
 
 <script runat="template">
 // My methods here.
@@ -103,75 +104,144 @@ public string buildClassName(string name, string ext) {
 public string buildMethodName(string name, string ext) {
     return ConvertColumnCamel(name) + ext;
 }
+
+public string GetControlType(int type) {
+    string result = "input";
+    switch (type) {
+        case 2:
+            result = "date";
+            break;
+        case 3:
+            result = "select";
+            break;
+        default:
+            break;
+    }
+    return result;
+}
 </script>
 <%
-    DataRow[] displayRows = NatureTable.Select("arg_type=2 and display=1");
+    Dictionary<string, string> dataDic = new Dictionary<string, string>();
+    DataRow[] dataDicRows = NatureTable.Select("data_dic_code is not null and data_dic_code<>''");
+    foreach (DataRow mappingRow in dataDicRows) {
+        if (!dataDic.ContainsKey(mappingRow["data_dic_code"].ToString())) {
+            dataDic[mappingRow["data_dic_code"].ToString()] = mappingRow["data_dic_code"].ToString();
+        }
+    }
 
 %>
 <template>
+<div class="client-manager-box">
 <el-dialog title="<%=ServiceName%>" :visible.sync="dialogFormVisible" :modal-append-to-body='false' distroy-on-close='true'>
-  <comForm
-      v-if='dialogFormVisible'
-      ref="formRef"
-      :data="model"
-      :field-list="fieldList"
-      :list-type-info="listTypeInfo"
-      :catalogProductFlag="false"
-      :exportBtnFlag="false"
-      :remote="true"
-      class="creditRecordSearchBar"
+    <commonTable
+      :columns="columns"
+      :data="tableData"
+      :pager="page"
+      :paginationBoxReflow="paginationBoxReflow"
+      :total="page.total"
+      :showCheck="True"
+      @handleSizeChange="handleSizeChange"
+      @handleCurrentChange="handleCurrentChange"
     >
-        <el-button @click="close">关闭</el-button>
-    </comForm>
+        <el-table-column
+        slot="table_oper"
+        align="center"
+        label="操作"
+        width="160"
+        :resizable="false"
+      >
+      </el-table-column>
+    </commonTable>
 </el-dialog>
+</div>
 </template>
-
 <script>
-import service from "@/api/pc_service.js"
-import comForm from '@/components/comForm/comForm'
-
+import commonTable from '@/components/commonTable/commonTable'
+import commonSearch from '@/components/commonSearch/commonSearch'
+import api from "@/api/<%=MenuCode%>.js"
+<%DataRow[] displayRows = NatureTable.Select("arg_type=2 and display=1", "sort"); %>
 export default {
-    name: "<%=ServiceCode%>_view",
+    name: "<%=NatureTable.TableName%>",
     components: {
-        comForm
+        commonTable,
+        commonSearch,
+    },
+    props: {
     },
     data() {
         return {
-            model: {
-            },
-            fieldList: [
+            columns: [
             ],
-            listTypeInfo: {
+            tableData: [
+            ],
+            fullServiceInfo: {
             },
-            dialogFormVisible: false,
+            page: {
+                page: 1,//当前页
+                pageSize: 10,//当前显示页数
+                sizes: [10, 20, 30, 40],//分页条数设置
+                total: 0//总页数
+              },//表格中的分页
+            paginationBoxReflow: true,
         }
     },
     mounted() {
         this.init();
+        this.list();
     },
     methods: {
+        list() {
+            this.innerList(1);
+        },
+        refresh() {
+            this.innerList(this.page.page);
+        },
+        innerList(currentPage) {
+            this.page.page = currentPage;
+            api.<%=buildMethodName(NatureTable.TableName, ActionMapping) %>({...this.queryModel}).then(t=>{
+                if (t.code != 200) {
+                    return;
+                }
+                this.tableData = t.data;
+            });
+            
+        },
+        handleSizeChange(pageSize) {
+            this.page.pageSize = pageSize;
+            this.list();
+        },
+        handleCurrentChange(index) {
+            this.innerList(index);
+        },
+        show(row) {
+            this.model = row;
+            this.list();
+            this.dialogFormVisible = true;
+        },
         close() {
             this.dialogFormVisible = false;
         },
-        show(data) {
-            this.model = data;
-            this.dialogFormVisible = true;
-        },
         init() {
-            service.getFullServiceInfo({serviceCode: '<%=ServiceCode%>', actionMapping: '<%=ActionMapping%>', menuId: <%=MenuId%>}).then(t=> {
+            service.getFullServiceInfo({serviceCode: '<%=NatureTable.TableName%>', actionMapping: '<%=ActionMapping%>'}).then(t=> {
                 if (t.code != 200) {
                     return;
                 }
                 this.fullServiceInfo = t.data;
-                let temp = service.genFormModels(this.fullServiceInfo.displayOutputNatures);
-                this.model = service.getModel(this.fullServiceInfo.displayOutputNatures);
-                for (var i = 0; i < temp.length; i++) {
-                    temp[i].disabled = true;
-                }
-                this.fieldList = temp;
+                this.columns = service.genColumns(this.fullServiceInfo);
             });
         },
-    }
-}
-
+    },
+};
 </script>
+
+<style lang="scss" scoped>
+.client-manager-box {
+  .operationBtn {
+    .operationBtn_span {
+      margin-right: 10px;
+      color: rgb(64, 158, 255);
+    }
+  }
+}
+</style>
+

@@ -100,6 +100,23 @@ public string buildClassName(string name, string ext) {
 public string buildMethodName(string name, string ext) {
     return ConvertColumnCamel(name) + ext;
 }
+
+public string getJdbcType(int? type) {
+    string result = "VARCHAR";
+    if (type.HasValue) {
+        return result;
+    }
+    switch (type) {
+        case 3:
+        case 100:
+            result = "INTEGER";
+            break;
+        case 101:
+            result = "NUMERIC";
+            break;
+    }
+    return result;
+}
 </script>
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
@@ -109,8 +126,6 @@ public string buildMethodName(string name, string ext) {
         String serviceName = row["service_name"].ToString();
         String serviceCode = row["service_code"]?.ToString();
         String mapping = row["action_mapping"].ToString();
-    //System.Diagnostics.Debugger.Launch();
-    //System.Diagnostics.Debugger.Break(); 
         int? type = row["type"] as int?;
         switch (type) {
             case 0:%>
@@ -119,10 +134,11 @@ public string buildMethodName(string name, string ext) {
             if (!string.IsNullOrEmpty(mapping)) {
                 %>'<%=mapping%>',<%
             }
-            DataRow[] inputRows = natureTable.Select("arg_type=1");
+            DataRow[] inputRows = natureTable.Select("arg_type=1", "input_sort");
             for (int x=0;x<inputRows.Length;x++) {
                 String natureCode = inputRows[x]["nature_code"].ToString();
-                %>#{<%=natureCode%>}<%
+                int? fieldType = inputRows[x]["field_type"] as int?;
+                %>#{<%=ConvertColumnCamel(natureCode)%>, jdbcType=<%=getJdbcType(fieldType)%>}<%
                 if (x<inputRows.Length-1) {
                     %>,<%
                 }
@@ -138,10 +154,11 @@ public string buildMethodName(string name, string ext) {
             if (!string.IsNullOrEmpty(mapping)) {
                 %>'<%=mapping%>',<%
             }
-            DataRow[] rows = natureTable.Select("arg_type=1");
+            DataRow[] rows = natureTable.Select("arg_type=1", "input_sort");
             for (int x=0;x<rows.Length;x++) {
                 String natureCode = rows[x]["nature_code"].ToString();
-                %>#{<%=natureCode%>}<%
+                int? fieldType = rows[x]["field_type"] as int?;
+                %>#{<%=ConvertColumnCamel(natureCode)%>, jdbcType=<%=getJdbcType(fieldType)%>}<%
                 if (x<rows.Length-1) {
                     %>,<%
                 }

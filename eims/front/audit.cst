@@ -2,11 +2,13 @@
 <%@ Assembly Name="SchemaExplorer" %>
 <%@ Import Namespace="SchemaExplorer"%>
 <%@ Import Namespace="System.Text" %>
-<%@ Property Name="NatureTable" Type="DataTable" Optional="True"%>
 <%@ Property Name="ServiceCode" Type="System.String" %>
 <%@ Property Name="ServiceName" Type="System.String" %>
 <%@ Property Name="ActionMapping" Type="System.String" %>
+<%@ Property Name="EditServiceCode" Type="System.String" %>
+<%@ Property Name="EditActionMapping" Type="System.String" %>
 <%@ Property Name="MenuCode" Type="System.String" %>
+<%@ Property Name="MenuId" Type="Int32" %>
 
 <script runat="template">
 // My methods here.
@@ -105,72 +107,75 @@ public string buildMethodName(string name, string ext) {
 }
 </script>
 <%
-    DataRow[] displayRows = NatureTable.Select("arg_type=1");
-    DataRow[] dataDicRows = NatureTable.Select("data_dic_code is not null and data_dic_code<>''");
 
 %>
 <template>
 <div>
-  <el-row>
-    <el-col :span="1"><span class="title">基本信息</span></el-col>
-    <el-col :span="3"></el-col>
-    <el-col :span="1" @click="save" v-show="showNeedSave()"><el-button>保存</el-button></el-col>
-    <el-col :span="1" @click="submitAudit" v-show="showNeedSubmit()"><el-button>提交审核</el-button></el-col>
-    <el-col :span="1" @click="approve" v-show="showNeedAudit()"><el-button>审核通过</el-button></el-col>
-    <el-col :span="1" @click="reject" v-show="showNeedAudit()"><el-button>驳回</el-button></el-col>
-  </el-row>
-  <hr>
-  <el-form :model="model">
-  <% foreach (DataRow displayRow in displayRows) {%>
-    <el-form-item label="<%=displayRow["nature_name"].ToString()%>">
-    <% if (!string.IsNullOrEmpty(displayRow["data_dic_code"].ToString())) {%>
-        <el-select filterable clearable  v-model="model.<%=displayRow["nature_code"].ToString()%>">
-            <el-option v-for="(item,index) in <%=displayRow["data_dic_code"].ToString()%>" :key="index" :label="item.name" :value="item.value" />
-        </el-select>
-    <%}
-    else if (displayRow["nature_code"].ToString().EndsWith("date")) {%>
-        <el-date-picker v-model="model.<%=displayRow["nature_code"].ToString()%>" type="date" />
-    <%}
-    else {%>
-        <el-input v-model="model.<%=displayRow["nature_code"].ToString()%>" autocomplete="off" />
-    <%}%>
-    </el-form-item>
-  <%}%>
-  </el-form>
+    <comForm
+      ref="formRef"
+      :data="model"
+      :field-list="fieldList"
+      :list-type-info="listTypeInfo"
+      :catalogProductFlag="false"
+      :exportBtnFlag="false"
+      :remote="true"
+      class="creditRecordSearchBar"
+    >
+        <el-button @click="save" v-show="showNeedSave()">保存</el-button>
+        <el-button @click="submitAudit" v-show="showNeedSubmit()">提交审核</el-button>
+        <el-button @click="approve" v-show="showNeedAudit()">审核通过</el-button>
+        <el-button @click="reject" v-show="showNeedAudit()">驳回</el-button>
+    </comForm>
 </div>
 </template>
 
 <script>
 import api from "@/api/<%=MenuCode%>.js"
+import service from "@/api/pc_service.js"
+import dataDicApi from "@/api/datadic.js"
+import comForm from '@/components/comForm/comForm'
 export default {
     name: "<%=ServiceCode%>_audit",
+    components: {
+        comForm
+    },
     props: {
-        model: Object,
-        <%foreach (DataRow row in dataDicRows) {%>
-        <%=row["data_dic_code"].ToString() %>: Array,
-        <%} %>
     },
     data() {
         return {
+            fieldList: [
+            ],
+            /**搜索/重置区域是否隐藏 */
+            btnHidden: true,
+            /**组件尺寸 */
+            // size: 'small',
+            /**默认展示搜索条件 */
+            count: 4,
+            /**label/item 宽度 */
+            width: {
+              labelWidth: 110,
+              itemWidth: 220
+            },
+            listTypeInfo: {
+            },
             model: {
-  <% foreach (DataRow displayRow in displayRows) {%>
-                <%=displayRow["nature_code"].ToString() %>: "",
-  <%}%>
             },
             dialogFormVisible: false,
         }
     },
+    mounted() {
+        this.init();
+    },
     methods: {
         close() {
-            dialogFormVisible = false;
+            this.dialogFormVisible = false;
         },
         show(data) {
             this.model = data;
-            dialogFormVisible = true;
+            this.dialogFormVisible = true;
         },
-        save(row) {
-            this.model = row;
-            api.<%=buildMethodName(ServiceCode, ActionMapping) %>(row).then(t=> {
+        save() {
+            api.<%=buildMethodName(EditServiceCode, EditActionMapping) %>(this.model).then(t=> {
                 if (t != 200) {
                     return;
                 }
@@ -187,31 +192,34 @@ export default {
             this.audit(1);
         },
         showNeedAudit() {
-            return this.model.stat == 1;
+            return this.data.stat == 1;
         },
         showNeedSave() {
-            return this.model.stat == 0 || this.model.stat == 3;
+            return this.data.stat == 0 || this.data.stat == 3;
         },
         showNeedSubmit() {
-            return this.model.stat == 0;
+            return this.data.stat == 0;
         },
         audit(status) {
-            api.<%=buildMethodName(ServiceCode, ActionMapping)%>({...this.model, stat: status}).then(t=> {
+            api.<%=buildMethodName(ServiceCode, ActionMapping)%>({...this.data, stat: status}).then(t=> {
                 if (t.code != 200) {
                     return;
                 }
-                this.model.stat = status;
+                this.data.stat = status;
             });
+        },
+        init() {
+            service.getFullServiceInfo({serviceCode: '<%=EditServiceCode%>', actionMapping: '<%=EditActionMapping%>', menuId: <%=MenuId%>}).then(t=> {
+                if (t.code != 200) {
+                    return;
+                }
+                this.fullServiceInfo = t.data;
+                this.fieldList = service.genQueryModel(this.fullServiceInfo);
+                this.model = service.getModel(this.fullServiceInfo.displayInputNatures);
+            });
+            this.listTypeInfo = dataDicApi.getAll();
         },
     }
 }
 
 </script>
-
-<style lang="less">
-.title {
-    font-size: 20px;
-}
-.save-button {
-}
-</style>

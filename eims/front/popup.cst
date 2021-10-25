@@ -1,0 +1,370 @@
+﻿<%@ Template Language="C#" TargetLanguage="Java" Encoding="UTF-8" ResponseEncoding="UTF-8"%>
+<%@ Assembly Name="SchemaExplorer" %>
+<%@ Import Namespace="SchemaExplorer"%>
+<%@ Import Namespace="System.Text" %>
+<%@ Import Namespace="System.Collections.Generic" %>
+<%@ Property Name="NatureTable" Type="DataTable" Optional="True"%>
+<%@ Property Name="ServiceName" Type="System.String" Optional="True"%>
+<%@ Property Name="MenuCode" Type="System.String" Optional="True"%>
+
+
+<script runat="template">
+// My methods here.
+public String ConvertTableCamel(String tableName) {
+    if (tableName.StartsWith("t_")) {
+        tableName = tableName.TrimStart('t','_').TrimEnd('_');
+    }
+    if (tableName.StartsWith("p_")) {
+        tableName = tableName.TrimStart('p','_').TrimEnd('_');
+    }
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = true;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            if (!int.TryParse(ch.ToString(), out parse)) {
+                builder.Append(ch.ToString());
+            }
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+public String ConvertColumnCamel(String tableName) {
+    if (tableName.StartsWith("t_")) {
+        tableName = tableName.TrimStart('t','_').TrimEnd('_');
+    }
+    if (tableName.StartsWith("p_")) {
+        tableName = tableName.TrimStart('p','_').TrimEnd('_');
+    }
+    StringBuilder builder = new StringBuilder();
+    bool needUpper = false;
+    int i = 0;
+    foreach (char ch in tableName) {
+        if (i == tableName.Length - 1) {
+            int parse = -1;
+            builder.Append(ch.ToString());
+        } 
+        else if (needUpper) {
+            builder.Append(ch.ToString().ToUpper());
+            needUpper = false;
+        }
+        else if (ch.Equals('_')) {
+            needUpper = true;
+        } else {
+            builder.Append(ch.ToString());
+        }
+        i++;
+    }
+    return builder.ToString();
+}
+
+public string ConvertColumnType(DbType type) {
+    string typeName = "String";
+    switch (type) {
+        case DbType.Int16:
+        case DbType.Int32:
+        case DbType.Int64:
+        case DbType.Boolean:
+        case DbType.UInt16:
+        case DbType.UInt32:
+        case DbType.UInt64:
+        case DbType.SByte:
+            typeName = "Integer";
+            break;
+        case DbType.String:
+            typeName = "String";
+            break;
+        case DbType.DateTime:
+        case DbType.Date:
+            typeName = "Date";
+            break;
+        case DbType.Decimal:
+            typeName = "BigDecimal";
+            break;
+    }
+    return typeName;
+}
+
+public string buildClassName(string name, string ext) {
+    return ConvertTableCamel(name) + ext;
+}
+
+public string buildMethodName(string name, string ext) {
+    return ConvertColumnCamel(name) + ext;
+}
+
+public string GetControlType(int type) {
+    string result = "input";
+    switch (type) {
+        case 2:
+            result = "date";
+            break;
+        case 3:
+            result = "select";
+            break;
+        default:
+            break;
+    }
+    return result;
+}
+</script>
+<%
+    Dictionary<string, string> dataDic = new Dictionary<string, string>();
+    DataRow[] dataDicRows = NatureTable.Select("data_dic_code is not null and data_dic_code<>''");
+    foreach (DataRow mappingRow in dataDicRows) {
+        if (!dataDic.ContainsKey(mappingRow["data_dic_code"].ToString())) {
+            dataDic[mappingRow["data_dic_code"].ToString()] = mappingRow["data_dic_code"].ToString();
+        }
+    }
+
+%>
+<template>
+<div class="client-manager-box">
+<el-dialog title="<%=ServiceName%>" :visible.sync="dialogFormVisible" :modal-append-to-body='false'>
+    <commonSearch
+      ref="searchRef"
+      :data="filterInfo.queryModel"
+      :field-list="filterInfo.queryModelType"
+      :list-type-info="listTypeInfo"
+      :count="filterInfo.count"
+      :catalogProductFlag="false"
+      :exportBtnFlag="false"
+      :remote="true"
+      class="creditRecordSearchBar"
+      @handleFilter="list"
+      @handleReset="handleReset"
+    />
+    <commonTable
+      :columns="columns"
+      :data="tableData"
+      :pager="page"
+      :paginationBoxReflow="paginationBoxReflow"
+      :total="total"
+      :showCheck="True"
+      @handleSizeChange="handleSizeChange"
+      @handleCurrentChange="handleCurrentChange"
+    >
+        <el-table-column
+        slot="table_oper"
+        align="center"
+        label="操作"
+        width="160"
+        :resizable="false"
+      >
+        <template slot-scope="scope">
+          <div class="operationBtn">
+            <a class="operationBtn_span" @click="doAdd(scope.$index, scope.row)">添加</a>
+          </div>
+        </template>
+      </el-table-column>
+    </commonTable>
+    <el-checkbox label="全选" @change="checkAll" v-model="allChecked"/>
+    <el-button type="text" label="批量添加" @click="save"/>
+</el-dialog>
+</div>
+</template>
+<script>
+import commonTable from '@/components/commonTable/commonTable'
+import commonSearch from '@/components/commonSearch/commonSearch'
+import api from "@/api/<%=MenuCode%>.js"
+import dataDicApi from "@/api/datadic.js"
+export default {
+    name: "<%=NatureTable.TableName%>",
+    components: {
+        commonTable,
+        commonSearch,
+    },
+    props: {
+    },
+    data() {
+        return {
+            filterInfo: {
+                queryModel: {
+                <%
+                    DataRow[] inputDisplayRows = NatureTable.Select("arg_type=1 and display=1", "sort");
+                    foreach (DataRow displayRow in inputDisplayRows) {
+                    %>
+                    <%=displayRow["nature_code"].ToString()%>: "",
+                    <%}%>
+                },
+                queryModelType: [
+                <% 
+                    foreach (DataRow displayRow in inputDisplayRows) {
+                    %>
+                    {
+                        label: '<%=displayRow["nature_name"].ToString()%>',
+                        value: '<%=ConvertColumnCamel(displayRow["nature_code"].ToString())%>',
+                        <%
+                        int? type=displayRow["field_type"] as int? ;
+                        switch (type) {
+                            case 2:%>
+                        type: 'date',
+                        dateType: 'date',
+                                <%break;
+                            case 3:%>
+                        type: 'select',
+                        list: '<%=buildMethodName(displayRow["nature_code"].ToString(), "")%>_bind',
+                                <%break;
+                            default:%>
+                        type: 'input',
+                                <%break;
+                        }
+                        %>
+                    },
+                    <%}%>
+                ],
+                /**搜索/重置区域是否隐藏 */
+                btnHidden: true,
+                /**组件尺寸 */
+                // size: 'small',
+                /**默认展示搜索条件 */
+                count: 3,
+                /**label/item 宽度 */
+                width: {
+                  labelWidth: 110,
+                  itemWidth: 220
+                },
+            },
+            
+            newModel: {
+            <%
+                DataRow[] displayRows = NatureTable.Select("arg_type=2 and display=1", "sort");
+                foreach (DataRow displayRow in displayRows) {
+                %>
+                <%=displayRow["nature_code"].ToString()%>: "",
+                <%}%>
+            },
+            columns: [
+            <%
+                foreach (DataRow displayRow in displayRows) {
+                    int? canEdit = displayRow["can_edit"] as int?;
+                    int? type = displayRow["field_type"] as int?;
+                %>
+                { prop: '<%=displayRow["nature_code"].ToString()%>', label: '<%=displayRow["nature_name"].ToString()%>', align: 'center', width: '',
+                <% if (canEdit==1) {%> editorType:'<%=GetControlType(type.Value)%>' <%} %>},
+                <%}%>
+            ],
+            tableData: [
+            ],
+            allChecked: false,
+            
+            deleteVisible: false,
+            canEdit: true,
+            editList: [],
+            auditVisible: false,
+            listTypeInfo: {
+            <%foreach (var key in dataDic.Keys) {%>
+                <%=buildMethodName(key, "")%>_bind: [{id:null, name:"全部"}],
+            <%} %>
+            },
+            <%foreach (var key in dataDic.Keys) {%>
+            <%=buildMethodName(key, "")%>: [],
+            <%=buildMethodName(key, "")%>_map: {},
+            <%} %>
+            page: {
+                page: 1,//当前页
+                pageSize: 10,//当前显示页数
+                sizes: [10, 20, 30, 40],//分页条数设置
+                total: 0//总页数
+              },//表格中的分页
+            paginationBoxReflow: false,
+        }
+    },
+    mounted() {
+        this.list();
+    },
+    methods: {
+        doAdd(index, row) {
+            row.isChecked = True;
+        },
+        save() {
+            var list = [];
+            for(var i = 0; i < this.tableData.length; i++) {
+                var data = this.tableData[i];
+                if (!data.isCheceked) {
+                    continue;
+                }
+                list.push(data);
+            }
+            api.save(list).then(t=> {
+                if (t.code != 200) {
+                    return;
+                }
+                this.$emit("onRefresh");
+                this.$message("添加成功");
+                this.close();
+            });
+        },
+        list() {
+            this.innerList(1);
+        },
+        refresh() {
+            this.innerList(this.page.page);
+        },
+        innerList(currentPage) {
+            this.page.page = currentPage;
+            api.<%=buildMethodName(NatureTable.TableName, "") %>({...this.queryModel, pagenum: this.page.page, pagesize: this.page.pageSize}).then(t=>{
+                if (t.code != 200) {
+                    return;
+                }
+                this.tableData = t.data;
+                for (var i = 0; i < this.tableData.length; i++) {
+                    this.tableData[i].isEditor = false;
+                    <% foreach (DataRow natureRow in NatureTable.Rows) {
+                            string dataDicCode = natureRow["data_dic_code"].ToString();
+                            if (!string.IsNullOrEmpty(dataDicCode)) {%>
+                    this.tableData[i].<%=ConvertColumnCamel(natureRow["nature_code"].ToString())%>_name = this.<%=buildMethodName(dataDicCode, "") %>[this.tableData[i].<%=ConvertColumnCamel(natureRow["nature_code"].ToString())%>];
+                    <%      } 
+                        }%>
+                }
+                if (t.data.length > 0) {
+                    this.page.total = t.data[0].wrowcount;
+                }
+            });
+            
+        },
+        handleSizeChange(pageSize) {
+            this.page.pageSize = pageSize;
+            this.list();
+        },
+        handleCurrentChange(index) {
+            this.innerList(index);
+        },
+        show() {
+            this.dialogFormVisible = true;
+        },
+        close() {
+            this.dialogFormVisible = false;
+        },
+        checkAll() {
+            for (var i = 0; i < tableData.length; i++) {
+                var data = tableData[i];
+                data.isChecked = allChecked;
+            }
+        },
+    },
+};
+</script>
+
+<style lang="scss" scoped>
+.client-manager-box {
+  .operationBtn {
+    .operationBtn_span {
+      margin-right: 10px;
+      color: rgb(64, 158, 255);
+    }
+  }
+}
+</style>
+
